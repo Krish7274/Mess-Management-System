@@ -1,43 +1,46 @@
-from flask import Flask
+import os
+from flask import Flask, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 
 from config import Config
 from models import db, User
-from routes import api  # ✅ your routes.py blueprint
-
+from routes import api
 
 def create_app():
     load_dotenv()
-
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # ✅ Enable CORS for frontend
+    # upload folder
+    upload_folder = os.path.join(os.getcwd(), "uploads")
+    os.makedirs(upload_folder, exist_ok=True)
+    app.config["UPLOAD_FOLDER"] = upload_folder
+    app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5 MB
+
     CORS(app, resources={r"/*": {"origins": "*"}})
 
-    # ✅ Init DB + JWT
     db.init_app(app)
     JWTManager(app)
 
-    # ✅ Register blueprint ONLY ONCE
     app.register_blueprint(api, url_prefix="/api")
 
-    # ✅ Create tables + seed admin
+    @app.get("/")
+    def home():
+      return {"ok": True, "service": "mess-backend"}
+
+    @app.get("/uploads/<path:filename>")
+    def uploaded_file(filename):
+        return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+
     with app.app_context():
         db.create_all()
         seed_admin()
 
-    @app.get("/")
-    def home():
-        return {"ok": True, "service": "mess-backend"}
-
     return app
 
-
 def seed_admin():
-    """Create default admin if not exists"""
     if not User.query.filter_by(email="admin@mess.com").first():
         admin = User(
             name="Admin",
@@ -49,7 +52,6 @@ def seed_admin():
         admin.set_password("Admin@123")
         db.session.add(admin)
         db.session.commit()
-
 
 app = create_app()
 

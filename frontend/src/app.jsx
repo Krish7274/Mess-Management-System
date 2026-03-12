@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
-
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -12,6 +11,7 @@ import Billing from "./pages/Billing";
 import Inventory from "./pages/Inventory";
 import Complaints from "./pages/Complaints";
 import Notifications from "./pages/Notifications";
+import AdminUsers from "./pages/AdminUsers";
 
 export default function App() {
   return (
@@ -37,7 +37,7 @@ export default function App() {
           <Route path="inventory" element={<Inventory />} />
           <Route path="complaints" element={<Complaints />} />
           <Route path="notifications" element={<Notifications />} />
-          <Route path="admin-users" element={<Dashboard />} />
+          <Route path="admin-users" element={<AdminUsers />} />
         </Route>
 
         <Route

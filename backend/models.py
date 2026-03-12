@@ -22,8 +22,8 @@ class User(db.Model):
 
 class Menu(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.String(20), nullable=False)         # YYYY-MM-DD
-    meal_type = db.Column(db.String(20), nullable=False)    # Breakfast/Lunch/Dinner
+    date = db.Column(db.String(20), nullable=False)
+    meal_type = db.Column(db.String(20), nullable=False)
     items = db.Column(db.Text, nullable=False)
 
 class Attendance(db.Model):
@@ -31,21 +31,24 @@ class Attendance(db.Model):
     user_id = db.Column(db.Integer, nullable=False)
     date = db.Column(db.String(20), nullable=False)
     meal_type = db.Column(db.String(20), nullable=False)
-    status = db.Column(db.String(20), nullable=False)       # Taken/Skipped
+    status = db.Column(db.String(20), nullable=False)
 
 class Bill(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, nullable=False)
-    month = db.Column(db.String(20), nullable=False)        # 2026-03
+    month = db.Column(db.String(20), nullable=False)
     amount = db.Column(db.Float, nullable=False)
-    status = db.Column(db.String(20), default="Unpaid")     # Paid/Unpaid
+    status = db.Column(db.String(20), default="Unpaid")
 
 class Payment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     bill_id = db.Column(db.Integer, nullable=False)
-    mode = db.Column(db.String(20), nullable=False)         # Cash/UPI/NetBanking
+    mode = db.Column(db.String(20), nullable=False)
+    proof_filename = db.Column(db.String(255), nullable=True)
+    receipt_no = db.Column(db.String(60), nullable=True)
+    note = db.Column(db.String(255), nullable=True)
     paid_at = db.Column(db.DateTime, default=datetime.utcnow)
-
+    
 class Inventory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     category = db.Column(db.String(50), nullable=False)
@@ -58,12 +61,12 @@ class Complaint(db.Model):
     user_id = db.Column(db.Integer, nullable=False)
     type = db.Column(db.String(50), nullable=False)
     message = db.Column(db.Text, nullable=False)
-    status = db.Column(db.String(20), default="Open")       # Open/Resolved
+    status = db.Column(db.String(20), default="Open")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Notification(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(120), nullable=False)
     message = db.Column(db.Text, nullable=False)
-    role_target = db.Column(db.String(20), nullable=True)   # Admin/User/Staff or None
+    role_target = db.Column(db.String(20), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
