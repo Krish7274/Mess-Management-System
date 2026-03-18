@@ -3,11 +3,11 @@ import Sidebar from "./Sidebar";
 
 export default function Layout() {
   return (
-    <div className="shell">
+    <div className="appLayout">
       <Sidebar />
-      <div className="container">
+      <main className="mainContent">
         <Outlet />
-      </div>
+      </main>
     </div>
   );
 }

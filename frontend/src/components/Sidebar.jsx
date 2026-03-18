@@ -1,86 +1,61 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { getUser, logout } from "../auth";
 
 export default function Sidebar() {
-  const u = getUser();
-  const isAdminOrStaff = u?.role === "Admin" || u?.role === "Staff";
-  const isAdmin = u?.role === "Admin";
+  const navigate = useNavigate();
+  const user = getUser();
+
+  const userName = user?.name || "User";
+  const userRole = user?.role || "Role";
 
   function handleLogout() {
     logout();
-    window.location.href = "/login";
+    navigate("/login");
   }
 
-  const linkStyle = ({ isActive }) => ({
-    display: "block",
-    padding: "10px 12px",
-    borderRadius: "12px",
-    margin: "6px 0",
-    color: "var(--txt)",
-    textDecoration: "none",
-    background: isActive ? "rgba(59,130,246,.18)" : "rgba(255,255,255,.05)",
-    border: "1px solid rgba(255,255,255,.08)",
-    fontWeight: 700
-  });
+  const navItems = [
+    { to: "/app", label: "Dashboard" },
+    { to: "/app/profile", label: "Profile" },
+    { to: "/app/menu", label: "Menu" },
+    { to: "/app/attendance", label: "Attendance" },
+    { to: "/app/complaints", label: "Complaints" },
+    { to: "/app/notifications", label: "Notifications" },
+    { to: "/app/billing", label: "Billing" },
+    { to: "/app/inventory", label: "Inventory" },
+    { to: "/app/admin-users", label: "Admin Users" },
+  ];
 
   return (
-    <div className="sidebar">
-      <div className="card">
-        <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontWeight: 900, fontSize: 28 }}>🍽️ MESS</div>
-            <div className="muted" style={{ fontSize: 14 }}>
-              {u?.name} ({u?.role})
-            </div>
+    <header className="topbar">
+      <div className="topbarLeft">
+        <div className="brandBlock">
+          <div className="brandTitle">🍽️ MESS</div>
+          <div className="brandSubtext">
+            {userName} ({userRole})
           </div>
-
-          <button className="btn btnRed" onClick={handleLogout}>
-            Logout
-          </button>
         </div>
       </div>
 
-      <div className="nav" style={{ marginTop: 12 }}>
-        <NavLink to="/app" end style={linkStyle}>
-          Dashboard
-        </NavLink>
-
-        <NavLink to="/app/profile" style={linkStyle}>
-          Profile
-        </NavLink>
-
-        <NavLink to="/app/menu" style={linkStyle}>
-          Menu
-        </NavLink>
-
-        <NavLink to="/app/attendance" style={linkStyle}>
-          Attendance
-        </NavLink>
-
-        <NavLink to="/app/complaints" style={linkStyle}>
-          Complaints
-        </NavLink>
-
-        <NavLink to="/app/notifications" style={linkStyle}>
-          Notifications
-        </NavLink>
-
-        <NavLink to="/app/billing" style={linkStyle}>
-          Billing
-        </NavLink>
-
-        {isAdminOrStaff && (
-          <NavLink to="/app/inventory" style={linkStyle}>
-            Inventory
+      <nav className="navMenu">
+        {navItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.to === "/app"}
+            className={({ isActive }) =>
+              isActive ? "navItem active" : "navItem"
+            }
+          >
+            {item.label}
           </NavLink>
-        )}
+        ))}
+      </nav>
 
-        {isAdmin && (
-          <NavLink to="/app/admin-users" style={linkStyle}>
-            Admin Users
-          </NavLink>
-        )}
+      <div className="topbarRight">
+        <button className="logoutBtn" onClick={handleLogout}>
+          Logout
+        </button>
       </div>
-    </div>
+    </header>
   );
 }

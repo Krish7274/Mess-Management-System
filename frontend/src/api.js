@@ -1,32 +1,22 @@
 import axios from "axios";
-import { getToken, logout } from "./auth";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE,
+  baseURL: "http://127.0.0.1:5000/api",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  timeout: 10000,
 });
 
-api.interceptors.request.use((config) => {
-  const t = getToken();
-  if (t) config.headers.Authorization = `Bearer ${t}`;
-  return config;
-});
-
-api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    const status = err?.response?.status;
-
-    // Only logout on 401 (token invalid)
-    if (status === 401) {
-      logout();
-      if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
-      }
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-
-    // Always reject so pages can show error message instead of crashing
-    return Promise.reject(err);
-  }
+    return config;
+  },
+  (error) => Promise.reject(error)
 );
 
 export default api;

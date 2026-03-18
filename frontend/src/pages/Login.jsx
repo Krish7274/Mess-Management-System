@@ -1,88 +1,100 @@
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../api";
 import { saveAuth } from "../auth";
 
 export default function Login() {
-  const [email, setEmail] = useState("admin@mess.com");
-  const [password, setPassword] = useState("Admin@123");
-  const [agree, setAgree] = useState(false);
+  const navigate = useNavigate();
+
+  const [form, setForm] = useState({
+    email: "",
+    password: ""
+  });
+
   const [err, setErr] = useState("");
+  const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function submit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setErr("");
-
-    if (!agree) {
-      setErr("Accept Terms & Conditions");
-      return;
-    }
-
+    setMsg("");
     setLoading(true);
+
     try {
-      const res = await api.post("/auth/login", { email, password });
+      const payload = {
+        email: form.email.trim().toLowerCase(),
+        password: form.password
+      };
+
+      const res = await api.post("/auth/login", payload);
+
+      if (!res?.data?.access_token || !res?.data?.user) {
+        throw new Error("Invalid login response from server");
+      }
+
       saveAuth(res.data);
-      window.location.href = "/app";
-    } catch (e2) {
-      setErr(e2?.response?.data?.error || "Login failed");
+      setMsg("Login successful");
+
+      setTimeout(() => {
+        navigate("/app");
+      }, 500);
+    } catch (e) {
+      console.error("LOGIN ERROR:", e);
+
+      if (e.code === "ECONNABORTED") {
+        setErr("Server timeout. Backend may not be running.");
+      } else if (e.message === "Network Error") {
+        setErr("Network Error: Backend is not running or API URL is wrong.");
+      } else {
+        setErr(
+          e?.response?.data?.error ||
+          e?.message ||
+          "Login failed"
+        );
+      }
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="container" style={{ maxWidth: 900, margin: "0 auto", paddingTop: 60 }}>
-      <div className="grid">
-        <div className="card">
-          <span className="badge">Blue + Red Theme</span>
-          <h1>Mess Management</h1>
-          <p className="muted">Login to manage menu, billing, inventory, complaints.</p>
-          <p className="muted">
-            <b>Demo Admin:</b> admin@mess.com / Admin@123
-          </p>
-        </div>
+    <div className="authPage">
+      <div className="authCard">
+        <h1>Login</h1>
 
-        <form className="card" onSubmit={submit}>
-          <h2>Login</h2>
+        {msg && <div className="badge">{msg}</div>}
+        {err && <div className="errorBox">{err}</div>}
 
-          {err && (
-            <div className="card" style={{ borderColor: "rgba(239,68,68,.35)", marginBottom: 12 }}>
-              {err}
-            </div>
-          )}
-
-          <label className="muted">Email</label>
+        <form onSubmit={handleSubmit}>
+          <label>Email</label>
           <input
             className="input"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            placeholder="Enter email"
+            required
           />
 
-          <label className="muted">Password</label>
+          <label>Password</label>
           <input
             className="input"
             type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            placeholder="Enter password"
+            required
           />
 
-          <label className="row">
-            <input
-              type="checkbox"
-              checked={agree}
-              onChange={(e) => setAgree(e.target.checked)}
-            />
-            <span className="muted">I agree to Terms & Conditions</span>
-          </label>
-
-          <button className="btn btnBlue" disabled={loading}>
-            {loading ? "Logging in..." : "Login"}
+          <button className="btn btnBlue" type="submit" disabled={loading}>
+            {loading ? "Please wait..." : "Login"}
           </button>
-
-          <div style={{ marginTop: 12 }}>
-            <a href="/register">New user? Register here</a>
-          </div>
         </form>
+
+        <p style={{ marginTop: 16 }}>
+          Don&apos;t have an account? <Link to="/register">Register</Link>
+        </p>
       </div>
     </div>
   );

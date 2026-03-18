@@ -1,35 +1,73 @@
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../api";
 
 export default function Register() {
+  const navigate = useNavigate();
+
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
     contact: "",
-    room_no: ""
+    room_no: "",
+    otp: ""
   });
 
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  const [msg, setMsg] = useState("");
+  const [otpMsg, setOtpMsg] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setMsg("");
+  async function handleSendOtp() {
     setErr("");
+    setMsg("");
+    setOtpMsg("");
 
-    if (!form.name || !form.email || !form.password) {
-      setErr("Name, Email and Password are required");
+    if (!form.email.trim()) {
+      setErr("Please enter email first");
       return;
     }
 
-    setLoading(true);
     try {
-      const res = await api.post("/auth/register", {
-        ...form,
-        role: "User"
+      setOtpLoading(true);
+
+      const res = await api.post("/auth/send-otp", {
+        email: form.email.trim().toLowerCase()
       });
+
+      setOtpMsg(res.data?.message || "OTP sent successfully");
+    } catch (e) {
+      console.error("SEND OTP ERROR:", e);
+      setErr(
+        e?.response?.data?.error ||
+        e?.message ||
+        "Failed to send OTP"
+      );
+    } finally {
+      setOtpLoading(false);
+    }
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setErr("");
+    setMsg("");
+
+    try {
+      setLoading(true);
+
+      const payload = {
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        contact: form.contact.trim(),
+        room_no: form.room_no.trim(),
+        otp: form.otp.trim()
+      };
+
+      const res = await api.post("/auth/register", payload);
 
       setMsg(res.data?.message || "Registered successfully");
 
@@ -38,70 +76,85 @@ export default function Register() {
         email: "",
         password: "",
         contact: "",
-        room_no: ""
+        room_no: "",
+        otp: ""
       });
 
       setTimeout(() => {
-        window.location.href = "/login";
-      }, 1500);
-    } catch (e2) {
-      setErr(e2?.response?.data?.error || "Registration failed");
+        navigate("/login");
+      }, 1000);
+    } catch (e) {
+      console.error("REGISTER ERROR:", e);
+      setErr(
+        e?.response?.data?.error ||
+        e?.message ||
+        "Registration failed"
+      );
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="container" style={{ maxWidth: 900, margin: "0 auto", paddingTop: 60 }}>
-      <div className="grid">
-        <div className="card">
-          <span className="badge">New User Registration</span>
-          <h1>Create Account</h1>
-          <p className="muted">
-            Register with your own email and password to use the Mess Management System.
-          </p>
-          <p className="muted">
-            After registration, you can login from the login page.
-          </p>
-        </div>
+    <div className="authPage">
+      <div className="authCard">
+        <h1>Register</h1>
 
-        <form className="card" onSubmit={handleSubmit}>
-          <h2>Register</h2>
+        {msg && <div className="badge">{msg}</div>}
+        {otpMsg && <div className="badge" style={{ marginBottom: 10 }}>{otpMsg}</div>}
+        {err && <div className="errorBox">{err}</div>}
 
-          {msg && <div className="badge" style={{ marginBottom: 12 }}>{msg}</div>}
-          {err && (
-            <div className="card" style={{ borderColor: "rgba(239,68,68,.35)", marginBottom: 12 }}>
-              {err}
-            </div>
-          )}
-
-          <label className="muted">Full Name</label>
+        <form onSubmit={handleSubmit}>
+          <label>Full Name</label>
           <input
             className="input"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="Enter your full name"
+            placeholder="Enter full name"
+            required
           />
 
-          <label className="muted">Email</label>
+          <label>Email</label>
+          <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+            <input
+              className="input"
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              placeholder="Enter email"
+              required
+              style={{ flex: 1, marginBottom: 0 }}
+            />
+            <button
+              type="button"
+              className="btn btnBlue"
+              onClick={handleSendOtp}
+              disabled={otpLoading}
+            >
+              {otpLoading ? "Sending..." : "Send OTP"}
+            </button>
+          </div>
+
+          <label>OTP</label>
           <input
             className="input"
-            type="email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            placeholder="Enter your email"
+            value={form.otp}
+            onChange={(e) => setForm({ ...form, otp: e.target.value })}
+            placeholder="Enter 6-digit OTP"
+            required
           />
 
-          <label className="muted">Password</label>
+          <label>Password</label>
           <input
             className="input"
             type="password"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
-            placeholder="Enter your password"
+            placeholder="Enter password"
+            required
           />
 
-          <label className="muted">Contact Number</label>
+          <label>Contact Number</label>
           <input
             className="input"
             value={form.contact}
@@ -109,7 +162,7 @@ export default function Register() {
             placeholder="Enter contact number"
           />
 
-          <label className="muted">Room No</label>
+          <label>Room No</label>
           <input
             className="input"
             value={form.room_no}
@@ -117,13 +170,14 @@ export default function Register() {
             placeholder="Enter room number"
           />
 
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <a href="/login">Already have an account? Login</a>
-            <button className="btn btnBlue" disabled={loading}>
-              {loading ? "Registering..." : "Register"}
-            </button>
-          </div>
+          <button className="btn btnBlue" type="submit" disabled={loading}>
+            {loading ? "Please wait..." : "Register"}
+          </button>
         </form>
+
+        <p style={{ marginTop: 16 }}>
+          Already have an account? <Link to="/login">Login</Link>
+        </p>
       </div>
     </div>
   );

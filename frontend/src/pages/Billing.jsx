@@ -12,7 +12,8 @@ export default function Billing() {
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState({
     user_id: "",
-    month: "2026-03",
+    bill_type: "monthly",
+    period: new Date().toISOString().slice(0, 7),
     amount: 1500
   });
 
@@ -68,22 +69,24 @@ export default function Billing() {
     setMsg("");
     setErr("");
 
-    if (!form.user_id || !form.month || !form.amount) {
-      setErr("Select user, month and amount");
+    if (!form.user_id || !form.period || !form.amount) {
+      setErr("Select user, bill type, period and amount");
       return;
     }
 
     try {
       const res = await api.post("/billing/create", {
         user_id: Number(form.user_id),
-        month: form.month,
+        bill_type: form.bill_type,
+        period: form.period,
         amount: Number(form.amount)
       });
 
       setMsg(res.data?.message || "Bill created successfully");
       setForm({
         user_id: "",
-        month: "2026-03",
+        bill_type: "monthly",
+        period: new Date().toISOString().slice(0, 7),
         amount: 1500
       });
 
@@ -157,7 +160,8 @@ MESS MANAGEMENT SYSTEM PAYMENT RECEIPT
 -------------------------------------
 Receipt No : ${receipt.receipt_no}
 Bill ID    : ${receipt.bill_id}
-Month      : ${receipt.month}
+Bill Type  : ${receipt.bill_type}
+Period     : ${receipt.period || receipt.month}
 Amount     : ₹${receipt.amount}
 Mode       : ${receipt.mode}
 Paid At    : ${receipt.paid_at}
@@ -196,7 +200,7 @@ Thank you for your payment.
           <ul className="muted">
             {myBills.map((b) => (
               <li key={b.id} style={{ marginBottom: 14 }}>
-                {b.month} • ₹{b.amount} • <b>{b.status}</b>{" "}
+                {(b.period || b.month)} • {b.bill_type === "daily" ? "Daily" : "Monthly"} • ₹{b.amount} • <b>{b.status}</b>{" "}
                 {b.status !== "Paid" && (
                   <button
                     className="btn btnBlue"
@@ -236,6 +240,10 @@ Thank you for your payment.
           <p className="muted">Only Admin can create bills.</p>
         ) : (
           <>
+            <p className="muted" style={{ marginBottom: 12 }}>
+              Admin can create a daily bill or a whole monthly bill from here.
+            </p>
+
             <select
               className="input"
               value={form.user_id}
@@ -249,11 +257,30 @@ Thank you for your payment.
               ))}
             </select>
 
+            <select
+              className="input"
+              value={form.bill_type}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  bill_type: e.target.value,
+                  period:
+                    e.target.value === "daily"
+                      ? new Date().toISOString().slice(0, 10)
+                      : new Date().toISOString().slice(0, 7)
+                })
+              }
+            >
+              <option value="monthly">Monthly Bill</option>
+              <option value="daily">Daily Bill</option>
+            </select>
+
             <input
               className="input"
-              value={form.month}
-              onChange={(e) => setForm({ ...form, month: e.target.value })}
-              placeholder="Month (e.g. 2026-03)"
+              type={form.bill_type === "daily" ? "date" : "month"}
+              value={form.period}
+              onChange={(e) => setForm({ ...form, period: e.target.value })}
+              placeholder={form.bill_type === "daily" ? "Select date" : "Select month"}
             />
 
             <input
@@ -283,7 +310,8 @@ Thank you for your payment.
                   <tr>
                     <th style={thStyle}>User</th>
                     <th style={thStyle}>Email</th>
-                    <th style={thStyle}>Month</th>
+                    <th style={thStyle}>Bill Type</th>
+                    <th style={thStyle}>Period</th>
                     <th style={thStyle}>Amount</th>
                     <th style={thStyle}>Status</th>
                     <th style={thStyle}>Mode</th>
@@ -296,7 +324,8 @@ Thank you for your payment.
                     <tr key={bill.id}>
                       <td style={tdStyle}>{bill.user_name}</td>
                       <td style={tdStyle}>{bill.user_email}</td>
-                      <td style={tdStyle}>{bill.month}</td>
+                      <td style={tdStyle}>{bill.bill_type === "daily" ? "Daily" : "Monthly"}</td>
+                      <td style={tdStyle}>{bill.period || bill.month}</td>
                       <td style={tdStyle}>₹{bill.amount}</td>
                       <td style={tdStyle}>
                         <b style={{ color: bill.status === "Paid" ? "#22c55e" : "#f87171" }}>
