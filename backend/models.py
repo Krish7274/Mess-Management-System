@@ -51,9 +51,9 @@ class Bill(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, nullable=False)
     month = db.Column(db.String(20), nullable=False)
+    bill_type = db.Column(db.String(20), nullable=False, default="monthly")
     amount = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default="Unpaid")
-
 
 class Payment(db.Model):
     id = db.Column(db.Integer, primary_key=True)

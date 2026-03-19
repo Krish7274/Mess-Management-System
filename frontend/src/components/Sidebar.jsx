@@ -22,7 +22,9 @@ export default function Sidebar() {
     { to: "/app/notifications", label: "Notifications" },
     { to: "/app/billing", label: "Billing" },
     { to: "/app/inventory", label: "Inventory" },
-    { to: "/app/admin-users", label: "Admin Users" },
+    ...((userRole === "Admin" || userRole === "Staff")
+      ? [{ to: "/app/admin-users", label: "Manage Users" }]
+      : []),
   ];
 
   return (

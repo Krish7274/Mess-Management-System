@@ -14,11 +14,12 @@ export default function Billing() {
     user_id: "",
     bill_type: "monthly",
     period: new Date().toISOString().slice(0, 7),
-    amount: 1500
+    amount: 1500,
   });
 
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  const [allBillsErr, setAllBillsErr] = useState("");
 
   const [showQrModal, setShowQrModal] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState(null);
@@ -41,11 +42,15 @@ export default function Billing() {
 
   async function loadAllBills() {
     if (!isAdmin) return;
+
     try {
+      setAllBillsErr("");
       const res = await api.get("/billing/all");
-      setAllBills(res.data || []);
+      setAllBills(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
-      console.log("All bills error:", e);
+      console.error("All bills error:", e);
+      setAllBills([]);
+      setAllBillsErr(e?.response?.data?.error || "Failed to load all users billing list");
     }
   }
 
@@ -79,7 +84,7 @@ export default function Billing() {
         user_id: Number(form.user_id),
         bill_type: form.bill_type,
         period: form.period,
-        amount: Number(form.amount)
+        amount: Number(form.amount),
       });
 
       setMsg(res.data?.message || "Bill created successfully");
@@ -87,7 +92,7 @@ export default function Billing() {
         user_id: "",
         bill_type: "monthly",
         period: new Date().toISOString().slice(0, 7),
-        amount: 1500
+        amount: 1500,
       });
 
       loadMyBills();
@@ -137,7 +142,7 @@ export default function Billing() {
       }
 
       const res = await api.post("/billing/pay", formData, {
-        headers: { "Content-Type": "multipart/form-data" }
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
       setMsg(res.data?.message || "Payment recorded successfully");
@@ -267,7 +272,7 @@ Thank you for your payment.
                   period:
                     e.target.value === "daily"
                       ? new Date().toISOString().slice(0, 10)
-                      : new Date().toISOString().slice(0, 7)
+                      : new Date().toISOString().slice(0, 7),
                 })
               }
             >
@@ -280,7 +285,6 @@ Thank you for your payment.
               type={form.bill_type === "daily" ? "date" : "month"}
               value={form.period}
               onChange={(e) => setForm({ ...form, period: e.target.value })}
-              placeholder={form.bill_type === "daily" ? "Select date" : "Select month"}
             />
 
             <input
@@ -300,6 +304,12 @@ Thank you for your payment.
       {isAdmin && (
         <div className="card" style={{ gridColumn: "1 / -1" }}>
           <h1>All Users Billing List (Admin Only)</h1>
+
+          {allBillsErr && (
+            <div className="card" style={{ borderColor: "rgba(239,68,68,.35)", marginBottom: 12 }}>
+              {allBillsErr}
+            </div>
+          )}
 
           {allBills.length === 0 ? (
             <p className="muted">No user bills found</p>
@@ -322,10 +332,10 @@ Thank you for your payment.
                 <tbody>
                   {allBills.map((bill) => (
                     <tr key={bill.id}>
-                      <td style={tdStyle}>{bill.user_name}</td>
-                      <td style={tdStyle}>{bill.user_email}</td>
+                      <td style={tdStyle}>{bill.user_name || "-"}</td>
+                      <td style={tdStyle}>{bill.user_email || "-"}</td>
                       <td style={tdStyle}>{bill.bill_type === "daily" ? "Daily" : "Monthly"}</td>
-                      <td style={tdStyle}>{bill.period || bill.month}</td>
+                      <td style={tdStyle}>{bill.period || bill.month || "-"}</td>
                       <td style={tdStyle}>₹{bill.amount}</td>
                       <td style={tdStyle}>
                         <b style={{ color: bill.status === "Paid" ? "#22c55e" : "#f87171" }}>
@@ -333,9 +343,7 @@ Thank you for your payment.
                         </b>
                       </td>
                       <td style={tdStyle}>{bill.payment?.mode || "-"}</td>
-                      <td style={tdStyle}>
-                        {bill.payment?.receipt_no ? bill.payment.receipt_no : "-"}
-                      </td>
+                      <td style={tdStyle}>{bill.payment?.receipt_no || "-"}</td>
                       <td style={tdStyle}>
                         {bill.payment?.proof_url ? (
                           <a
@@ -425,7 +433,6 @@ Thank you for your payment.
                       Download Receipt
                     </button>
                   )}
-
                   <button className="btn btnRed" onClick={closeQrModal}>
                     Close
                   </button>
@@ -442,10 +449,10 @@ Thank you for your payment.
 const thStyle = {
   textAlign: "left",
   padding: "12px",
-  borderBottom: "1px solid rgba(255,255,255,.15)"
+  borderBottom: "1px solid rgba(255,255,255,.15)",
 };
 
 const tdStyle = {
   padding: "12px",
-  borderBottom: "1px solid rgba(255,255,255,.08)"
+  borderBottom: "1px solid rgba(255,255,255,.08)",
 };

@@ -1,5 +1,8 @@
+import os
 import random
 from datetime import datetime, timedelta
+from werkzeug.utils import secure_filename
+from flask import send_from_directory
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import (
@@ -10,6 +13,7 @@ from models import (
     db,
     User,
     Bill,
+    Payment,
     Notification,
     EmailOTP,
     Menu,
@@ -21,6 +25,10 @@ from utils.email_service import send_bill_email, send_otp_email
 
 api = Blueprint("api", __name__)
 
+@api.get("/uploads/<path:filename>")
+def uploaded_file(filename):
+    upload_dir = os.path.join(os.getcwd(), "uploads")
+    return send_from_directory(upload_dir, filename)
 
 # -----------------------------
 # ROLE CHECK
@@ -181,14 +189,128 @@ def me():
 
 
 # -----------------------------
+# UPDATE CURRENT USER PROFILE
+# -----------------------------
+@api.put("/users/me")
+@jwt_required()
+def update_me():
+    try:
+        uid = int(get_jwt_identity())
+        user = User.query.get_or_404(uid)
+
+        data = request.get_json() or {}
+
+        name = (data.get("name") or "").strip()
+        contact = (data.get("contact") or "").strip()
+        room_no = (data.get("room_no") or "").strip()
+
+        if not name:
+            return jsonify({"error": "Name is required"}), 400
+
+        user.name = name
+        user.contact = contact
+        user.room_no = room_no
+
+        db.session.commit()
+
+        return jsonify({
+            "message": "Profile updated successfully",
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "role": user.role,
+                "contact": user.contact,
+                "room_no": user.room_no
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print("UPDATE PROFILE ERROR:", e)
+        return jsonify({"error": "Failed to update profile"}), 500
+
+
+# -----------------------------
+# ADD USER (ADMIN / STAFF ONLY)
+# Admin can create Admin / Staff / User
+# Staff can create only User
+# -----------------------------
+@api.post("/users")
+@jwt_required()
+def add_user():
+    if not require_roles("Admin", "Staff")():
+        return jsonify({"error": "Forbidden"}), 403
+
+    try:
+        current_user = User.query.get_or_404(int(get_jwt_identity()))
+        data = request.get_json() or {}
+
+        name = (data.get("name") or "").strip()
+        email = (data.get("email") or "").lower().strip()
+        password = (data.get("password") or "").strip()
+        role = (data.get("role") or "User").strip()
+        contact = (data.get("contact") or "").strip()
+        room_no = (data.get("room_no") or "").strip()
+
+        if not name:
+            return jsonify({"error": "Name is required"}), 400
+        if not email:
+            return jsonify({"error": "Email is required"}), 400
+        if not password:
+            return jsonify({"error": "Password is required"}), 400
+
+        if current_user.role == "Admin":
+            allowed_roles = ["Admin", "Staff", "User"]
+        elif current_user.role == "Staff":
+            allowed_roles = ["User"]
+        else:
+            allowed_roles = []
+
+        if role not in allowed_roles:
+            return jsonify({"error": "You are not allowed to create this role"}), 403
+
+        existing = User.query.filter_by(email=email).first()
+        if existing:
+            return jsonify({"error": "Email already exists"}), 400
+
+        new_user = User(
+            name=name,
+            email=email,
+            role=role,
+            contact=contact,
+            room_no=room_no
+        )
+        new_user.set_password(password)
+
+        db.session.add(new_user)
+        db.session.commit()
+
+        return jsonify({
+            "message": "User added successfully",
+            "user": {
+                "id": new_user.id,
+                "name": new_user.name,
+                "email": new_user.email,
+                "role": new_user.role,
+                "contact": new_user.contact,
+                "room_no": new_user.room_no
+            }
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        print("ADD USER ERROR:", e)
+        return jsonify({"error": "Failed to add user"}), 500
+
+
+# -----------------------------
 # GET ALL USERS (ADMIN / STAFF)
 # -----------------------------
 @api.get("/users")
 @jwt_required()
 def list_users():
-    role = get_jwt().get("role")
-
-    if role not in ["Admin", "Staff"]:
+    if not require_roles("Admin", "Staff")():
         return jsonify({"error": "Forbidden"}), 403
 
     users = User.query.order_by(User.id.desc()).all()
@@ -203,7 +325,7 @@ def list_users():
             "room_no": u.room_no
         }
         for u in users
-    ])
+    ]), 200
 
 
 # -----------------------------
@@ -212,31 +334,95 @@ def list_users():
 @api.put("/users/<int:user_id>/role")
 @jwt_required()
 def update_user_role(user_id):
-    role = get_jwt().get("role")
+    if not require_roles("Admin")():
+        return jsonify({"error": "Only admin can change roles"}), 403
 
-    if role != "Admin":
-        return jsonify({"error": "Forbidden"}), 403
+    try:
+        current_user = User.query.get_or_404(int(get_jwt_identity()))
+        user = User.query.get_or_404(user_id)
 
-    data = request.get_json() or {}
-    new_role = data.get("role")
+        data = request.get_json() or {}
+        new_role = (data.get("role") or "").strip()
 
-    if new_role not in ["Admin", "User", "Staff"]:
-        return jsonify({"error": "role must be Admin, User, or Staff"}), 400
+        if new_role not in ["Admin", "User", "Staff"]:
+            return jsonify({"error": "role must be Admin, User, or Staff"}), 400
 
-    user = User.query.get_or_404(user_id)
-    user.role = new_role
-    db.session.commit()
+        if current_user.id == user.id and new_role != "Admin":
+            return jsonify({"error": "Admin cannot remove own admin role"}), 400
 
-    return jsonify({
-        "message": f"{user.name} role updated to {new_role}",
-        "user": {
-            "id": user.id,
-            "name": user.name,
-            "email": user.email,
-            "role": user.role
-        }
-    }), 200
+        user.role = new_role
+        db.session.commit()
 
+        return jsonify({
+            "message": f"{user.name} role updated to {new_role}",
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "role": user.role,
+                "contact": user.contact,
+                "room_no": user.room_no
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print("UPDATE ROLE ERROR:", e)
+        return jsonify({"error": "Failed to update role"}), 500
+
+
+# -----------------------------
+# DELETE USER (ADMIN ONLY)
+# Admin can delete only User / Staff
+# Admin cannot delete Admin
+# Admin cannot delete self
+# -----------------------------
+@api.delete("/users/<int:user_id>")
+@jwt_required()
+def delete_user(user_id):
+    if not require_roles("Admin")():
+        return jsonify({"error": "Only admin can delete users"}), 403
+
+    try:
+        current_user = User.query.get_or_404(int(get_jwt_identity()))
+        user = User.query.get_or_404(user_id)
+
+        if current_user.id == user.id:
+            return jsonify({"error": "Admin cannot delete own account"}), 400
+
+        if user.role == "Admin":
+            return jsonify({"error": "Admin account cannot be deleted"}), 400
+
+        # delete payments linked to user's bills
+        user_bills = Bill.query.filter_by(user_id=user.id).all()
+        bill_ids = [b.id for b in user_bills]
+
+        if bill_ids:
+            Payment.query.filter(Payment.bill_id.in_(bill_ids)).delete(synchronize_session=False)
+
+        # delete user bills
+        Bill.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+
+        # delete other linked records
+        Attendance.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+        Complaint.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+        Notification.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+        EmailOTP.query.filter_by(email=user.email).delete(synchronize_session=False)
+
+        deleted_name = user.name
+        deleted_role = user.role
+
+        db.session.delete(user)
+        db.session.commit()
+
+        return jsonify({
+            "message": f"{deleted_role} '{deleted_name}' deleted successfully"
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print("DELETE USER ERROR:", e)
+        return jsonify({"error": "Failed to delete user"}), 500
 
 # -----------------------------
 # MENU
@@ -602,7 +788,6 @@ def add_notification():
         print("NOTIFICATION ERROR:", e)
         return jsonify({"error": "Failed to create notification"}), 500
 
-
 # -----------------------------
 # CREATE BILL (ADMIN)
 # -----------------------------
@@ -617,29 +802,45 @@ def create_bill():
 
         user_id = data.get("user_id")
         amount = data.get("amount")
-        period = data.get("period")
-        bill_type = data.get("bill_type")
+        period = (data.get("period") or "").strip()
+        bill_type = (data.get("bill_type") or "monthly").strip().lower()
 
-        if not user_id or not amount or not period:
-            return jsonify({"error": "Missing fields"}), 400
+        if not user_id or amount is None or not period:
+            return jsonify({"error": "user_id, amount and period are required"}), 400
 
-        existing = Bill.query.filter_by(user_id=user_id, month=period).first()
-        if existing:
-            return jsonify({"error": "Bill already exists"}), 400
+        if bill_type not in ["monthly", "daily"]:
+            return jsonify({"error": "bill_type must be monthly or daily"}), 400
 
-        bill = Bill(
-            user_id=user_id,
-            month=period,
-            amount=amount,
-            status="Unpaid"
-        )
-        db.session.add(bill)
+        try:
+            user_id = int(user_id)
+            amount = float(amount)
+        except Exception:
+            return jsonify({"error": "user_id and amount must be valid numbers"}), 400
 
         user = User.query.get(user_id)
         if not user:
             return jsonify({"error": "User not found"}), 404
 
-        message = f"Your {bill_type} bill for {period} of ₹{amount} is generated."
+        existing = Bill.query.filter_by(
+            user_id=user_id,
+            month=period,
+            bill_type=bill_type
+        ).first()
+
+        if existing:
+            return jsonify({"error": "Bill already exists for this user, type and period"}), 400
+
+        bill = Bill(
+            user_id=user_id,
+            month=period,
+            bill_type=bill_type,
+            amount=amount,
+            status="Unpaid"
+        )
+        db.session.add(bill)
+        db.session.flush()
+
+        message = f"Your {bill_type.capitalize()} bill for {period} of ₹{amount} has been generated."
         notif = Notification(
             user_id=user.id,
             title="Bill Generated",
@@ -650,19 +851,34 @@ def create_bill():
         db.session.commit()
 
         if user.email:
-            send_bill_email(
-                user.email,
-                user.name,
-                bill_type,
-                period,
-                amount
-            )
+            try:
+                send_bill_email(
+                    user.email,
+                    user.name,
+                    bill_type.capitalize(),
+                    period,
+                    amount
+                )
+            except Exception as mail_error:
+                print("SEND BILL EMAIL ERROR:", mail_error)
 
-        return jsonify({"message": "Bill created & email sent"}), 201
+        return jsonify({
+            "message": "Bill created successfully",
+            "bill": {
+                "id": bill.id,
+                "user_id": bill.user_id,
+                "user_name": user.name,
+                "user_email": user.email,
+                "bill_type": bill.bill_type,
+                "period": bill.month,
+                "amount": bill.amount,
+                "status": bill.status
+            }
+        }), 201
 
     except Exception as e:
         db.session.rollback()
-        print("BILL ERROR:", e)
+        print("BILL CREATE ERROR:", e)
         return jsonify({"error": "Bill creation failed"}), 500
 
 
@@ -672,20 +888,33 @@ def create_bill():
 @api.get("/billing/my")
 @jwt_required()
 def my_bills():
-    user_id = int(get_jwt_identity())
+    try:
+        user_id = int(get_jwt_identity())
+        bills = Bill.query.filter_by(user_id=user_id).order_by(Bill.id.desc()).all()
 
-    bills = Bill.query.filter_by(user_id=user_id).all()
+        result = []
+        for b in bills:
+            payment = Payment.query.filter_by(bill_id=b.id).order_by(Payment.id.desc()).first()
 
-    result = []
-    for b in bills:
-        result.append({
-            "id": b.id,
-            "period": b.month,
-            "amount": b.amount,
-            "status": b.status
-        })
+            result.append({
+                "id": b.id,
+                "bill_type": b.bill_type,
+                "period": b.month,
+                "amount": b.amount,
+                "status": b.status,
+                "payment": {
+                    "mode": payment.mode,
+                    "receipt_no": payment.receipt_no,
+                    "proof_url": f"http://127.0.0.1:5000/api/uploads/{payment.proof_filename}" if payment and payment.proof_filename else None,
+                    "paid_at": payment.paid_at.isoformat() if payment and payment.paid_at else None
+                } if payment else None
+            })
 
-    return jsonify(result)
+        return jsonify(result), 200
+
+    except Exception as e:
+        print("MY BILLS ERROR:", e)
+        return jsonify({"error": "Failed to load my bills"}), 500
 
 
 # -----------------------------
@@ -697,20 +926,145 @@ def all_bills():
     if not require_roles("Admin")():
         return jsonify({"error": "Forbidden"}), 403
 
-    bills = Bill.query.all()
-    result = []
+    try:
+        bills = Bill.query.order_by(Bill.id.desc()).all()
 
-    for b in bills:
-        user = User.query.get(b.user_id)
-        if not user:
-            continue
+        result = []
+        for b in bills:
+            user = User.query.get(b.user_id)
+            payment = Payment.query.filter_by(bill_id=b.id).order_by(Payment.id.desc()).first()
 
-        result.append({
-            "user": user.name,
-            "email": user.email,
-            "period": b.month,
-            "amount": b.amount,
-            "status": b.status
-        })
+            result.append({
+                "id": b.id,
+                "user_id": b.user_id,
+                "user_name": user.name if user else "Unknown",
+                "user_email": user.email if user else "Unknown",
+                "bill_type": b.bill_type,
+                "period": b.month,
+                "amount": b.amount,
+                "status": b.status,
+                "payment": {
+                    "mode": payment.mode,
+                    "receipt_no": payment.receipt_no,
+                    "proof_url": f"http://127.0.0.1:5000/api/uploads/{payment.proof_filename}" if payment and payment.proof_filename else None,
+                    "paid_at": payment.paid_at.isoformat() if payment and payment.paid_at else None
+                } if payment else None
+            })
 
-    return jsonify(result)
+        return jsonify(result), 200
+
+    except Exception as e:
+        print("ALL BILLS ERROR:", e)
+        return jsonify({"error": "Failed to load all bills"}), 500
+
+
+# -----------------------------
+# PAY BILL
+# -----------------------------
+@api.post("/billing/pay")
+@jwt_required()
+def pay_bill():
+    try:
+        user_id = int(get_jwt_identity())
+
+        bill_id = request.form.get("bill_id")
+        mode = (request.form.get("mode") or "UPI").strip()
+        note = (request.form.get("note") or "").strip()
+        proof = request.files.get("proof")
+
+        if not bill_id:
+            return jsonify({"error": "bill_id is required"}), 400
+
+        try:
+            bill_id = int(bill_id)
+        except Exception:
+            return jsonify({"error": "Invalid bill_id"}), 400
+
+        bill = Bill.query.get_or_404(bill_id)
+
+        role = get_jwt().get("role")
+        if role != "Admin" and bill.user_id != user_id:
+            return jsonify({"error": "You can pay only your own bill"}), 403
+
+        if bill.status == "Paid":
+            return jsonify({"error": "Bill is already paid"}), 400
+
+        proof_filename = None
+
+        if proof:
+            upload_dir = os.path.join(os.getcwd(), "uploads")
+            os.makedirs(upload_dir, exist_ok=True)
+
+            original_name = secure_filename(proof.filename or "proof")
+            timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+            proof_filename = f"{timestamp}_{original_name}"
+            proof.save(os.path.join(upload_dir, proof_filename))
+
+        receipt_no = f"RCPT-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{bill.id}"
+
+        payment = Payment(
+            bill_id=bill.id,
+            mode=mode,
+            receipt_no=receipt_no,
+            proof_filename=proof_filename,
+            note=note
+        )
+
+        bill.status = "Paid"
+
+        db.session.add(payment)
+        db.session.commit()
+
+        return jsonify({
+            "message": "Payment recorded successfully",
+            "receipt": {
+                "receipt_no": receipt_no,
+                "bill_id": bill.id,
+                "bill_type": bill.bill_type,
+                "period": bill.month,
+                "amount": bill.amount,
+                "mode": mode,
+                "paid_at": payment.paid_at.isoformat() if payment.paid_at else datetime.utcnow().isoformat(),
+                "proof_url": f"http://127.0.0.1:5000/api/uploads/{proof_filename}" if proof_filename else None
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print("PAY BILL ERROR:", e)
+        return jsonify({"error": "Failed to update payment"}), 500
+
+
+# -----------------------------
+# GET RECEIPT BY BILL ID
+# -----------------------------
+@api.get("/billing/receipt/<int:bill_id>")
+@jwt_required()
+def get_receipt(bill_id):
+    try:
+        user_id = int(get_jwt_identity())
+        role = get_jwt().get("role")
+
+        bill = Bill.query.get_or_404(bill_id)
+
+        if role != "Admin" and bill.user_id != user_id:
+            return jsonify({"error": "Forbidden"}), 403
+
+        payment = Payment.query.filter_by(bill_id=bill.id).order_by(Payment.id.desc()).first()
+        if not payment:
+            return jsonify({"error": "Receipt not found"}), 404
+
+        return jsonify({
+            "receipt_no": payment.receipt_no,
+            "bill_id": bill.id,
+            "bill_type": bill.bill_type,
+            "period": bill.month,
+            "amount": bill.amount,
+            "mode": payment.mode,
+            "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
+            "proof_url": f"http://127.0.0.1:5000/api/uploads/{payment.proof_filename}" if payment.proof_filename else None
+        }), 200
+
+    except Exception as e:
+        print("GET RECEIPT ERROR:", e)
+        return jsonify({"error": "Failed to fetch receipt"}), 500
