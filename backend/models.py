@@ -13,6 +13,8 @@ class User(db.Model):
     role = db.Column(db.String(20), default="User")
     contact = db.Column(db.String(30), nullable=True)
     room_no = db.Column(db.String(30), nullable=True)
+    must_change_password = db.Column(db.Boolean, default=False)
+    password_changed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_password(self, p):
@@ -54,6 +56,7 @@ class Bill(db.Model):
     bill_type = db.Column(db.String(20), nullable=False, default="monthly")
     amount = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default="Unpaid")
+
 
 class Payment(db.Model):
     id = db.Column(db.Integer, primary_key=True)

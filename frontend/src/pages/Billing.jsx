@@ -56,6 +56,7 @@ export default function Billing() {
 
   async function loadUsers() {
     if (!isAdmin) return;
+
     try {
       const res = await api.get("/users");
       setUsers(res.data || []);
@@ -238,72 +239,68 @@ Thank you for your payment.
         )}
       </div>
 
-      <div className="card">
-        <h1>Admin Create Bill</h1>
+      {isAdmin && (
+        <div className="card">
+          <h1>Admin Create Bill</h1>
 
-        {!isAdmin ? (
-          <p className="muted">Only Admin can create bills.</p>
-        ) : (
-          <>
-            <p className="muted" style={{ marginBottom: 12 }}>
-              Admin can create a daily bill or a whole monthly bill from here.
-            </p>
+          <p className="muted" style={{ marginBottom: 12 }}>
+            Admin can create a daily bill or a whole monthly bill from here.
+          </p>
 
-            <select
-              className="input"
-              value={form.user_id}
-              onChange={(e) => setForm({ ...form, user_id: e.target.value })}
-            >
-              <option value="">Select user</option>
-              {users.map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.name} ({x.email})
-                </option>
-              ))}
-            </select>
+          <select
+            className="input"
+            value={form.user_id}
+            onChange={(e) => setForm({ ...form, user_id: e.target.value })}
+          >
+            <option value="">Select user</option>
+            {users.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name} ({x.email})
+              </option>
+            ))}
+          </select>
 
-            <select
-              className="input"
-              value={form.bill_type}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  bill_type: e.target.value,
-                  period:
-                    e.target.value === "daily"
-                      ? new Date().toISOString().slice(0, 10)
-                      : new Date().toISOString().slice(0, 7),
-                })
-              }
-            >
-              <option value="monthly">Monthly Bill</option>
-              <option value="daily">Daily Bill</option>
-            </select>
+          <select
+            className="input"
+            value={form.bill_type}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                bill_type: e.target.value,
+                period:
+                  e.target.value === "daily"
+                    ? new Date().toISOString().slice(0, 10)
+                    : new Date().toISOString().slice(0, 7),
+              })
+            }
+          >
+            <option value="monthly">Monthly Bill</option>
+            <option value="daily">Daily Bill</option>
+          </select>
 
-            <input
-              className="input"
-              type={form.bill_type === "daily" ? "date" : "month"}
-              value={form.period}
-              onChange={(e) => setForm({ ...form, period: e.target.value })}
-            />
+          <input
+            className="input"
+            type={form.bill_type === "daily" ? "date" : "month"}
+            value={form.period}
+            onChange={(e) => setForm({ ...form, period: e.target.value })}
+          />
 
-            <input
-              className="input"
-              value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value })}
-              placeholder="Amount"
-            />
+          <input
+            className="input"
+            value={form.amount}
+            onChange={(e) => setForm({ ...form, amount: e.target.value })}
+            placeholder="Amount"
+          />
 
-            <button className="btn btnRed" onClick={createBill}>
-              Create
-            </button>
-          </>
-        )}
-      </div>
+          <button className="btn btnRed" onClick={createBill}>
+            Create
+          </button>
+        </div>
+      )}
 
       {isAdmin && (
         <div className="card" style={{ gridColumn: "1 / -1" }}>
-          <h1>All Users Billing List (Admin Only)</h1>
+          <h1>All Users Billing List</h1>
 
           {allBillsErr && (
             <div className="card" style={{ borderColor: "rgba(239,68,68,.35)", marginBottom: 12 }}>

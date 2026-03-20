@@ -10,7 +10,7 @@ export default function Notifications() {
   const [form, setForm] = useState({
     title: "",
     message: "",
-    role_target: ""
+    role_target: "",
   });
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -41,7 +41,7 @@ export default function Notifications() {
       const payload = {
         title: form.title,
         message: form.message,
-        role_target: form.role_target || null
+        role_target: form.role_target || null,
       };
 
       const res = await api.post("/notifications", payload);
@@ -50,7 +50,7 @@ export default function Notifications() {
       setForm({
         title: "",
         message: "",
-        role_target: ""
+        role_target: "",
       });
 
       await load();
@@ -61,55 +61,52 @@ export default function Notifications() {
 
   return (
     <div className="grid">
-      <div className="card">
-        <h1>Notifications</h1>
+      {canAdd && (
+        <div className="card">
+          <h1>Notifications</h1>
 
-        {msg && <div className="badge" style={{ marginBottom: 12 }}>{msg}</div>}
-        {err && (
-          <div className="card" style={{ borderColor: "rgba(239,68,68,.35)", marginBottom: 12 }}>
-            {err}
-          </div>
-        )}
+          {msg && <div className="badge" style={{ marginBottom: 12 }}>{msg}</div>}
+          {err && (
+            <div className="card" style={{ borderColor: "rgba(239,68,68,.35)", marginBottom: 12 }}>
+              {err}
+            </div>
+          )}
 
-        {!canAdd ? (
-          <p className="muted">You can only view notifications.</p>
-        ) : (
-          <>
-            <input
-              className="input"
-              placeholder="Title"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-            />
+          <input
+            className="input"
+            placeholder="Title"
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+          />
 
-            <textarea
-              className="input"
-              rows="5"
-              placeholder="Message"
-              value={form.message}
-              onChange={(e) => setForm({ ...form, message: e.target.value })}
-            />
+          <textarea
+            className="input"
+            rows="5"
+            placeholder="Message"
+            value={form.message}
+            onChange={(e) => setForm({ ...form, message: e.target.value })}
+          />
 
-            <select
-              className="input"
-              value={form.role_target}
-              onChange={(e) => setForm({ ...form, role_target: e.target.value })}
-            >
-              <option value="">All</option>
-              <option value="Admin">Admin</option>
-              <option value="Staff">Staff</option>
-              <option value="User">User</option>
-            </select>
+          <select
+            className="input"
+            value={form.role_target}
+            onChange={(e) => setForm({ ...form, role_target: e.target.value })}
+          >
+            <option value="">All</option>
+            <option value="Admin">Admin</option>
+            <option value="Staff">Staff</option>
+            <option value="User">User</option>
+          </select>
 
-            <button className="btn btnBlue" onClick={addNotification}>
-              Send Notification
-            </button>
-          </>
-        )}
-      </div>
+          <button className="btn btnBlue" onClick={addNotification}>
+            Send Notification
+          </button>
+        </div>
+      )}
 
       <div className="card">
         <h2>Recent</h2>
+
         {list.length === 0 ? (
           <p className="muted">No notifications found</p>
         ) : (

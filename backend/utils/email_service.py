@@ -51,3 +51,29 @@ Mess Management System
     except Exception as e:
         print(f"❌ OTP email sending failed to {to_email}: {str(e)}")
         raise
+
+
+def send_user_welcome_email(to_email, user_name, temp_password):
+    try:
+        msg = Message(
+            subject="Your Mess Management Account Has Been Created",
+            recipients=[to_email],
+            body=f"""
+Hello {user_name},
+
+Your Mess Management System account has been created successfully.
+
+Temporary Password: {temp_password}
+
+Please login using your email and this temporary password.
+After login, you must change your password before using the system.
+
+Thank you.
+Mess Management System
+"""
+        )
+        mail.send(msg)
+        print(f"✅ Welcome email sent to {to_email}")
+    except Exception as e:
+        print(f"❌ Welcome email sending failed to {to_email}: {str(e)}")
+        raise

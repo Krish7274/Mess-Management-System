@@ -1,9 +1,9 @@
 import os
 import random
+import string
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 from flask import send_from_directory
-
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import (
     create_access_token, jwt_required, get_jwt, get_jwt_identity
@@ -21,14 +21,21 @@ from models import (
     Inventory,
     Complaint,
 )
-from utils.email_service import send_bill_email, send_otp_email
+from utils.email_service import send_bill_email, send_otp_email, send_user_welcome_email
 
 api = Blueprint("api", __name__)
+
 
 @api.get("/uploads/<path:filename>")
 def uploaded_file(filename):
     upload_dir = os.path.join(os.getcwd(), "uploads")
     return send_from_directory(upload_dir, filename)
+
+
+def generate_temp_password(length=10):
+    chars = string.ascii_letters + string.digits + "@#"
+    return "".join(random.choice(chars) for _ in range(length))
+
 
 # -----------------------------
 # ROLE CHECK
@@ -112,7 +119,9 @@ def register():
             email=email,
             contact=contact,
             room_no=room_no,
-            role="User"
+            role="User",
+            must_change_password=False,
+            password_changed_at=datetime.utcnow()
         )
         user.set_password(password)
 
@@ -150,7 +159,8 @@ def login():
             additional_claims={
                 "role": u.role,
                 "name": u.name,
-                "email": u.email
+                "email": u.email,
+                "must_change_password": u.must_change_password
             }
         )
 
@@ -160,13 +170,81 @@ def login():
                 "id": u.id,
                 "name": u.name,
                 "email": u.email,
-                "role": u.role
+                "role": u.role,
+                "contact": u.contact,
+                "room_no": u.room_no,
+                "must_change_password": u.must_change_password
             }
         }), 200
 
     except Exception as e:
         print("LOGIN ERROR:", str(e))
         return jsonify({"error": "Login failed"}), 500
+
+
+# -----------------------------
+# CHANGE PASSWORD AFTER LOGIN
+# -----------------------------
+@api.post("/auth/change-password")
+@jwt_required()
+def change_password():
+    try:
+        uid = int(get_jwt_identity())
+        user = User.query.get_or_404(uid)
+
+        data = request.get_json() or {}
+        current_password = (data.get("current_password") or "").strip()
+        new_password = (data.get("new_password") or "").strip()
+        confirm_password = (data.get("confirm_password") or "").strip()
+
+        if not current_password or not new_password or not confirm_password:
+            return jsonify({"error": "All password fields are required"}), 400
+
+        if not user.check_password(current_password):
+            return jsonify({"error": "Current password is incorrect"}), 400
+
+        if len(new_password) < 6:
+            return jsonify({"error": "New password must be at least 6 characters"}), 400
+
+        if new_password != confirm_password:
+            return jsonify({"error": "New password and confirm password do not match"}), 400
+
+        if current_password == new_password:
+            return jsonify({"error": "New password must be different from current password"}), 400
+
+        user.set_password(new_password)
+        user.must_change_password = False
+        user.password_changed_at = datetime.utcnow()
+        db.session.commit()
+
+        new_token = create_access_token(
+            identity=str(user.id),
+            additional_claims={
+                "role": user.role,
+                "name": user.name,
+                "email": user.email,
+                "must_change_password": user.must_change_password
+            }
+        )
+
+        return jsonify({
+            "message": "Password changed successfully",
+            "access_token": new_token,
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "role": user.role,
+                "contact": user.contact,
+                "room_no": user.room_no,
+                "must_change_password": user.must_change_password
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print("CHANGE PASSWORD ERROR:", e)
+        return jsonify({"error": "Failed to change password"}), 500
 
 
 # -----------------------------
@@ -184,7 +262,8 @@ def me():
         "email": u.email,
         "role": u.role,
         "contact": u.contact,
-        "room_no": u.room_no
+        "room_no": u.room_no,
+        "must_change_password": u.must_change_password
     })
 
 
@@ -221,7 +300,8 @@ def update_me():
                 "email": user.email,
                 "role": user.role,
                 "contact": user.contact,
-                "room_no": user.room_no
+                "room_no": user.room_no,
+                "must_change_password": user.must_change_password
             }
         }), 200
 
@@ -233,7 +313,7 @@ def update_me():
 
 # -----------------------------
 # ADD USER (ADMIN / STAFF ONLY)
-# Admin can create Admin / Staff / User
+# Admin/Staff create by email, temp password is auto-generated
 # Staff can create only User
 # -----------------------------
 @api.post("/users")
@@ -243,13 +323,10 @@ def add_user():
         return jsonify({"error": "Forbidden"}), 403
 
     try:
-        current_user = User.query.get_or_404(int(get_jwt_identity()))
         data = request.get_json() or {}
 
         name = (data.get("name") or "").strip()
         email = (data.get("email") or "").lower().strip()
-        password = (data.get("password") or "").strip()
-        role = (data.get("role") or "User").strip()
         contact = (data.get("contact") or "").strip()
         room_no = (data.get("room_no") or "").strip()
 
@@ -257,44 +334,53 @@ def add_user():
             return jsonify({"error": "Name is required"}), 400
         if not email:
             return jsonify({"error": "Email is required"}), 400
-        if not password:
-            return jsonify({"error": "Password is required"}), 400
 
-        if current_user.role == "Admin":
-            allowed_roles = ["Admin", "Staff", "User"]
-        elif current_user.role == "Staff":
-            allowed_roles = ["User"]
-        else:
-            allowed_roles = []
+        creator_role = get_jwt().get("role")
+        new_role = (data.get("role") or "User").strip()
 
-        if role not in allowed_roles:
-            return jsonify({"error": "You are not allowed to create this role"}), 403
+        if creator_role == "Staff":
+            new_role = "User"
+
+        if creator_role == "Admin" and new_role not in ["Admin", "Staff", "User"]:
+            return jsonify({"error": "Role must be Admin, Staff, or User"}), 400
+
+        if creator_role not in ["Admin", "Staff"]:
+            return jsonify({"error": "Forbidden"}), 403
 
         existing = User.query.filter_by(email=email).first()
         if existing:
             return jsonify({"error": "Email already exists"}), 400
 
+        temp_password = generate_temp_password()
+
         new_user = User(
             name=name,
             email=email,
-            role=role,
+            role=new_role,
             contact=contact,
-            room_no=room_no
+            room_no=room_no,
+            must_change_password=True
         )
-        new_user.set_password(password)
+        new_user.set_password(temp_password)
 
         db.session.add(new_user)
         db.session.commit()
 
+        try:
+            send_user_welcome_email(new_user.email, new_user.name, temp_password)
+        except Exception as mail_error:
+            print("WELCOME MAIL ERROR:", mail_error)
+
         return jsonify({
-            "message": "User added successfully",
+            "message": "User added successfully. Temporary password sent to email.",
             "user": {
                 "id": new_user.id,
                 "name": new_user.name,
                 "email": new_user.email,
                 "role": new_user.role,
                 "contact": new_user.contact,
-                "room_no": new_user.room_no
+                "room_no": new_user.room_no,
+                "must_change_password": new_user.must_change_password
             }
         }), 201
 
@@ -322,7 +408,8 @@ def list_users():
             "email": u.email,
             "role": u.role,
             "contact": u.contact,
-            "room_no": u.room_no
+            "room_no": u.room_no,
+            "must_change_password": u.must_change_password
         }
         for u in users
     ]), 200
@@ -361,7 +448,8 @@ def update_user_role(user_id):
                 "email": user.email,
                 "role": user.role,
                 "contact": user.contact,
-                "room_no": user.room_no
+                "room_no": user.room_no,
+                "must_change_password": user.must_change_password
             }
         }), 200
 
@@ -373,9 +461,6 @@ def update_user_role(user_id):
 
 # -----------------------------
 # DELETE USER (ADMIN ONLY)
-# Admin can delete only User / Staff
-# Admin cannot delete Admin
-# Admin cannot delete self
 # -----------------------------
 @api.delete("/users/<int:user_id>")
 @jwt_required()
@@ -393,17 +478,13 @@ def delete_user(user_id):
         if user.role == "Admin":
             return jsonify({"error": "Admin account cannot be deleted"}), 400
 
-        # delete payments linked to user's bills
         user_bills = Bill.query.filter_by(user_id=user.id).all()
         bill_ids = [b.id for b in user_bills]
 
         if bill_ids:
             Payment.query.filter(Payment.bill_id.in_(bill_ids)).delete(synchronize_session=False)
 
-        # delete user bills
         Bill.query.filter_by(user_id=user.id).delete(synchronize_session=False)
-
-        # delete other linked records
         Attendance.query.filter_by(user_id=user.id).delete(synchronize_session=False)
         Complaint.query.filter_by(user_id=user.id).delete(synchronize_session=False)
         Notification.query.filter_by(user_id=user.id).delete(synchronize_session=False)
@@ -423,6 +504,7 @@ def delete_user(user_id):
         db.session.rollback()
         print("DELETE USER ERROR:", e)
         return jsonify({"error": "Failed to delete user"}), 500
+
 
 # -----------------------------
 # MENU
@@ -787,6 +869,7 @@ def add_notification():
         db.session.rollback()
         print("NOTIFICATION ERROR:", e)
         return jsonify({"error": "Failed to create notification"}), 500
+
 
 # -----------------------------
 # CREATE BILL (ADMIN)

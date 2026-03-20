@@ -37,8 +37,12 @@ export default function Login() {
       setMsg("Login successful");
 
       setTimeout(() => {
-        navigate("/app");
-      }, 500);
+        if (res.data.user.must_change_password) {
+          navigate("/change-password");
+        } else {
+          navigate("/app");
+        }
+      }, 600);
     } catch (e) {
       console.error("LOGIN ERROR:", e);
 
@@ -59,42 +63,51 @@ export default function Login() {
   }
 
   return (
-    <div className="authPage">
-      <div className="authCard">
-        <h1>Login</h1>
+    <div className="authShell">
+      <div className="authOverlay" />
+      <div className="authCard modernAuthCard">
+        <div className="authHeader">
+          <div className="authBadge">MESS MANAGEMENT</div>
+          <h1>Welcome Back</h1>
+          <p>Login to continue to your account</p>
+        </div>
 
-        {msg && <div className="badge">{msg}</div>}
+        {msg && <div className="successBox">{msg}</div>}
         {err && <div className="errorBox">{err}</div>}
 
-        <form onSubmit={handleSubmit}>
-          <label>Email</label>
-          <input
-            className="input"
-            type="email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            placeholder="Enter email"
-            required
-          />
+        <form onSubmit={handleSubmit} className="authForm">
+          <div className="fieldBlock">
+            <label>Email</label>
+            <input
+              className="input authInput"
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              placeholder="Enter your email"
+              required
+            />
+          </div>
 
-          <label>Password</label>
-          <input
-            className="input"
-            type="password"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            placeholder="Enter password"
-            required
-          />
+          <div className="fieldBlock">
+            <label>Password</label>
+            <input
+              className="input authInput"
+              type="password"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              placeholder="Enter your password"
+              required
+            />
+          </div>
 
-          <button className="btn btnBlue" type="submit" disabled={loading}>
+          <button className="btn authPrimaryBtn" type="submit" disabled={loading}>
             {loading ? "Please wait..." : "Login"}
           </button>
         </form>
 
-        <p style={{ marginTop: 16 }}>
+        <div className="authFooterText">
           Don&apos;t have an account? <Link to="/register">Register</Link>
-        </p>
+        </div>
       </div>
     </div>
   );

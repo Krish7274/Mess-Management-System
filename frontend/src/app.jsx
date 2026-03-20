@@ -4,6 +4,7 @@ import Layout from "./components/Layout";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ChangePassword from "./pages/ChangePassword";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Menu from "./pages/Menu";
@@ -18,14 +19,19 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Default route */}
         <Route path="/" element={<Navigate to="/login" replace />} />
 
-        {/* Public routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route
+          path="/change-password"
+          element={
+            <ProtectedRoute allowedRoles={["Admin", "Staff", "User"]}>
+              <ChangePassword />
+            </ProtectedRoute>
+          }
+        />
 
-        {/* Protected app routes */}
         <Route
           path="/app"
           element={
@@ -34,18 +40,88 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Dashboard />} />
-          <Route path="profile" element={<Profile />} />
-          <Route path="menu" element={<Menu />} />
-          <Route path="attendance" element={<Attendance />} />
-          <Route path="billing" element={<Billing />} />
-          <Route path="inventory" element={<Inventory />} />
-          <Route path="complaints" element={<Complaints />} />
-          <Route path="notifications" element={<Notifications />} />
-          <Route path="admin-users" element={<AdminUsers />} />
+          <Route
+            index
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Staff", "User"]}>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="profile"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Staff", "User"]}>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="menu"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Staff", "User"]}>
+                <Menu />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="attendance"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Staff", "User"]}>
+                <Attendance />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="complaints"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Staff", "User"]}>
+                <Complaints />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="notifications"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Staff", "User"]}>
+                <Notifications />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="billing"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Staff", "User"]}>
+                <Billing />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="inventory"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Staff"]}>
+                <Inventory />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="admin-users"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Staff"]}>
+                <AdminUsers />
+              </ProtectedRoute>
+            }
+          />
         </Route>
 
-        {/* 404 fallback */}
         <Route
           path="*"
           element={
