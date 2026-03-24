@@ -1,129 +1,612 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../api";
 import { getUser } from "../auth";
 
-export default function Menu() {
-  const u = getUser();
-  const canAdd = u?.role === "Admin" || u?.role === "Staff";
+const DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
-  const [list, setList] = useState([]);
-  const [form, setForm] = useState({
+const MEALS = ["Breakfast", "Lunch", "Dinner"];
+
+function emptyWeeklyItems() {
+  return DAYS.reduce((acc, day) => {
+    acc[day] = {
+      Breakfast: { items: "", price: "" },
+      Lunch: { items: "", price: "" },
+      Dinner: { items: "", price: "" },
+    };
+    return acc;
+  }, {});
+}
+
+export default function Menu() {
+  const user = getUser();
+  const canManage = user?.role === "Admin" || user?.role === "Staff";
+
+  const [dailyForm, setDailyForm] = useState({
     date: "",
     meal_type: "Lunch",
     items: "",
   });
 
+  const [editingDailyId, setEditingDailyId] = useState(null);
+
+  const [recentMenu, setRecentMenu] = useState([]);
+  const [loadingRecent, setLoadingRecent] = useState(false);
+
+  const [weekStart, setWeekStart] = useState(getCurrentWeekStart());
+  const [weeklyItems, setWeeklyItems] = useState(emptyWeeklyItems());
+  const [weeklyMenus, setWeeklyMenus] = useState([]);
+  const [weeklyLoading, setWeeklyLoading] = useState(false);
+  const [editingWeeklyId, setEditingWeeklyId] = useState(null);
+
+  const [weeklySearch, setWeeklySearch] = useState("");
+
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  async function load() {
+  useEffect(() => {
+    loadRecentMenu();
+    loadWeeklyMenus();
+  }, []);
+
+  async function loadRecentMenu() {
     try {
+      setLoadingRecent(true);
       const res = await api.get("/menu");
-      setList(res.data || []);
-    } catch (error) {
-      console.error("LOAD MENU ERROR:", error);
-      setErr("Failed to load menu");
+      setRecentMenu(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      console.error("Load recent menu failed", e);
+    } finally {
+      setLoadingRecent(false);
     }
   }
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  async function add() {
+  async function loadWeeklyMenus() {
     try {
-      setErr("");
-      setMsg("");
+      setWeeklyLoading(true);
+      const res = await api.get("/menu/weekly");
+      setWeeklyMenus(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      console.error("Load weekly menu failed", e);
+    } finally {
+      setWeeklyLoading(false);
+    }
+  }
 
-      if (!form.date || !form.meal_type || !form.items.trim()) {
-        setErr("Please fill date, meal type and food items");
-        return;
-      }
+  async function saveDailyMenu(e) {
+    e.preventDefault();
+    setMsg("");
+    setErr("");
 
-      setLoading(true);
+    if (!dailyForm.date || !dailyForm.meal_type || !dailyForm.items.trim()) {
+      setErr("Please fill date, meal type and food items");
+      return;
+    }
 
-      await api.post("/menu", {
-        date: form.date,
-        meal_type: form.meal_type,
-        items: form.items.trim(),
-      });
+    try {
+      const payload = {
+        date: dailyForm.date,
+        meal_type: dailyForm.meal_type,
+        items: dailyForm.items.trim(),
+      };
 
-      setMsg("Menu added successfully");
-      setForm({
+      const res = editingDailyId
+        ? await api.put(`/menu/${editingDailyId}`, payload)
+        : await api.post("/menu", payload);
+
+      setMsg(
+        res.data?.message ||
+          (editingDailyId ? "Menu updated successfully" : "Menu added successfully")
+      );
+
+      setDailyForm({
         date: "",
         meal_type: "Lunch",
         items: "",
       });
-
-      await load();
-    } catch (error) {
-      console.error("ADD MENU ERROR:", error);
-      setErr(error?.response?.data?.error || "Failed to add menu");
-    } finally {
-      setLoading(false);
+      setEditingDailyId(null);
+      loadRecentMenu();
+    } catch (e) {
+      console.error("Save daily menu error", e);
+      setErr(e?.response?.data?.error || "Failed to save menu");
     }
   }
 
+  function editDailyMenu(menu) {
+    setEditingDailyId(menu.id);
+    setDailyForm({
+      date: menu.date || "",
+      meal_type: menu.meal_type || "Lunch",
+      items: menu.items || "",
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function deleteDailyMenu(menuId) {
+    const ok = window.confirm("Are you sure you want to delete this daily menu?");
+    if (!ok) return;
+
+    try {
+      const res = await api.delete(`/menu/${menuId}`);
+      setMsg(res.data?.message || "Menu deleted successfully");
+
+      if (editingDailyId === menuId) {
+        setEditingDailyId(null);
+        setDailyForm({
+          date: "",
+          meal_type: "Lunch",
+          items: "",
+        });
+      }
+
+      loadRecentMenu();
+    } catch (e) {
+      console.error("Delete daily menu error", e);
+      setErr(e?.response?.data?.error || "Failed to delete menu");
+    }
+  }
+
+  function cancelDailyEdit() {
+    setEditingDailyId(null);
+    setDailyForm({
+      date: "",
+      meal_type: "Lunch",
+      items: "",
+    });
+    setMsg("");
+    setErr("");
+  }
+
+  function updateWeeklyField(day, meal, field, value) {
+    setWeeklyItems((prev) => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        [meal]: {
+          ...prev[day][meal],
+          [field]: value,
+        },
+      },
+    }));
+  }
+
+  async function saveWeeklyMenu(e) {
+    e.preventDefault();
+    setMsg("");
+    setErr("");
+
+    try {
+      const payload = {
+        week_start: weekStart,
+        weekly_items: weeklyItems,
+      };
+
+      const res = editingWeeklyId
+        ? await api.put(`/menu/weekly/${editingWeeklyId}`, payload)
+        : await api.post("/menu/weekly", payload);
+
+      setMsg(
+        res.data?.message ||
+          (editingWeeklyId
+            ? "Weekly menu updated successfully"
+            : "Weekly menu saved successfully")
+      );
+
+      setEditingWeeklyId(null);
+      setWeekStart(getCurrentWeekStart());
+      setWeeklyItems(emptyWeeklyItems());
+      loadWeeklyMenus();
+    } catch (e) {
+      console.error("Save weekly menu error", e);
+      setErr(e?.response?.data?.error || "Failed to save weekly menu");
+    }
+  }
+
+  function editWeeklyMenu(menu) {
+    const next = emptyWeeklyItems();
+
+    DAYS.forEach((day) => {
+      MEALS.forEach((meal) => {
+        next[day][meal] = {
+          items: menu.weekly_items?.[day]?.[meal]?.items || "",
+          price: String(menu.weekly_items?.[day]?.[meal]?.price ?? ""),
+        };
+      });
+    });
+
+    setEditingWeeklyId(menu.id);
+    setWeekStart(menu.week_start || getCurrentWeekStart());
+    setWeeklyItems(next);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function deleteWeeklyMenu(menuId) {
+    const ok = window.confirm("Are you sure you want to delete this weekly menu?");
+    if (!ok) return;
+
+    try {
+      const res = await api.delete(`/menu/weekly/${menuId}`);
+      setMsg(res.data?.message || "Weekly menu deleted successfully");
+
+      if (editingWeeklyId === menuId) {
+        cancelWeeklyEdit();
+      }
+
+      loadWeeklyMenus();
+    } catch (e) {
+      console.error("Delete weekly menu error", e);
+      setErr(e?.response?.data?.error || "Failed to delete weekly menu");
+    }
+  }
+
+  function cancelWeeklyEdit() {
+    setEditingWeeklyId(null);
+    setWeekStart(getCurrentWeekStart());
+    setWeeklyItems(emptyWeeklyItems());
+    setMsg("");
+    setErr("");
+  }
+
+  const filteredWeeklyMenus = useMemo(() => {
+    const q = weeklySearch.trim().toLowerCase();
+    if (!q) return weeklyMenus;
+
+    return weeklyMenus.filter((menu) => {
+      const weekDates = getWeekDateMap(menu.week_start);
+
+      const matchDay = DAYS.some((day) => {
+        const dayDate = weekDates[day] || "";
+        const mealsText = MEALS.map((meal) => {
+          const entry = menu.weekly_items?.[day]?.[meal] || {};
+          return `${entry.items || ""} ${entry.price ?? ""}`;
+        }).join(" ");
+
+        const haystack = `${day} ${dayDate} ${mealsText}`.toLowerCase();
+        return haystack.includes(q);
+      });
+
+      return (
+        String(menu.week_start || "").toLowerCase().includes(q) || matchDay
+      );
+    });
+  }, [weeklyMenus, weeklySearch]);
+
   return (
-    <div className="grid">
-      {canAdd && (
+    <div className="menuPage">
+      {(msg || err) && (
         <div className="card">
-          <h2>Menu</h2>
-
-          {msg ? <p style={{ color: "green", marginBottom: "10px" }}>{msg}</p> : null}
-          {err ? <p style={{ color: "red", marginBottom: "10px" }}>{err}</p> : null}
-
-          <input
-            type="date"
-            className="input"
-            value={form.date}
-            onChange={(e) => setForm({ ...form, date: e.target.value })}
-          />
-
-          <select
-            className="input"
-            value={form.meal_type}
-            onChange={(e) => setForm({ ...form, meal_type: e.target.value })}
-          >
-            <option value="Breakfast">Breakfast</option>
-            <option value="Lunch">Lunch</option>
-            <option value="Dinner">Dinner</option>
-          </select>
-
-          <textarea
-            className="input"
-            rows="4"
-            placeholder="Food items..."
-            value={form.items}
-            onChange={(e) => setForm({ ...form, items: e.target.value })}
-          />
-
-          <button
-            className="btn btnBlue"
-            onClick={add}
-            disabled={loading}
-          >
-            {loading ? "Adding..." : "Add Menu"}
-          </button>
+          {msg ? <p style={{ color: "#16a34a", fontWeight: 700 }}>{msg}</p> : null}
+          {err ? <p style={{ color: "#ef4444", fontWeight: 700 }}>{err}</p> : null}
         </div>
       )}
 
-      <div className="card">
-        <h3>Recent Menu</h3>
+      {canManage ? (
+        <div className="grid menuTopGrid">
+          <div className="card">
+            <div className="menuSectionHeader">
+              <div>
+                <h1>{editingDailyId ? "Edit Daily Menu" : "Menu"}</h1>
+              </div>
+              {editingDailyId ? (
+                <button className="btn btnOrange" type="button" onClick={cancelDailyEdit}>
+                  Cancel Edit
+                </button>
+              ) : null}
+            </div>
 
-        {list.length === 0 ? (
-          <p className="muted">No menu added yet.</p>
+            <form onSubmit={saveDailyMenu}>
+              <input
+                className="input"
+                type="date"
+                value={dailyForm.date}
+                onChange={(e) =>
+                  setDailyForm((prev) => ({ ...prev, date: e.target.value }))
+                }
+              />
+
+              <select
+                className="input"
+                value={dailyForm.meal_type}
+                onChange={(e) =>
+                  setDailyForm((prev) => ({ ...prev, meal_type: e.target.value }))
+                }
+              >
+                <option value="Breakfast">Breakfast</option>
+                <option value="Lunch">Lunch</option>
+                <option value="Dinner">Dinner</option>
+              </select>
+
+              <textarea
+                className="input"
+                rows="5"
+                placeholder="Food items..."
+                value={dailyForm.items}
+                onChange={(e) =>
+                  setDailyForm((prev) => ({ ...prev, items: e.target.value }))
+                }
+              />
+
+              <button className="btn btnBlue" type="submit">
+                {editingDailyId ? "Update Menu" : "Add Menu"}
+              </button>
+            </form>
+          </div>
+
+          <div className="card">
+            <h2>Recent Menu</h2>
+
+            {loadingRecent ? (
+              <p className="muted">Loading...</p>
+            ) : recentMenu.length === 0 ? (
+              <p className="muted">No recent menu found.</p>
+            ) : (
+              <div className="menuListWrap">
+                {recentMenu.slice(0, 10).map((m) => (
+                  <div key={m.id} className="menuListCard">
+                    <div>
+                      <b>{m.date}</b> • {m.meal_type}
+                      <p className="muted" style={{ marginTop: 6 }}>{m.items}</p>
+                    </div>
+
+                    <div className="row">
+                      <button
+                        className="btn btnBlue"
+                        type="button"
+                        onClick={() => editDailyMenu(m)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn btnRed"
+                        type="button"
+                        onClick={() => deleteDailyMenu(m.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {canManage ? (
+        <div className="card">
+          <div className="menuWeeklyHeader">
+            <div>
+              <h2>{editingWeeklyId ? "Edit Weekly Menu" : "Weekly Menu"}</h2>
+            </div>
+
+            {editingWeeklyId ? (
+              <button className="btn btnOrange" type="button" onClick={cancelWeeklyEdit}>
+                Cancel Edit
+              </button>
+            ) : null}
+          </div>
+
+          <form onSubmit={saveWeeklyMenu}>
+            <div className="menuWeekStartRow">
+              <div>
+                <label className="menuLabel">Week Start Date</label>
+                <input
+                  className="input"
+                  type="date"
+                  value={weekStart}
+                  onChange={(e) => setWeekStart(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="weeklyMenuGrid">
+              {DAYS.map((day) => {
+                const weekDates = getWeekDateMap(weekStart);
+
+                return (
+                  <div key={day} className="weeklyDayCard">
+                    <h3>
+                      {day}
+                      <span className="menuDayDate">{weekDates[day]}</span>
+                    </h3>
+
+                    {MEALS.map((meal) => (
+                      <div key={meal} className="weeklyMealBlock">
+                        <label className="menuLabel">{meal}</label>
+
+                        <textarea
+                          className="input"
+                          rows="2"
+                          placeholder={`${meal} items`}
+                          value={weeklyItems[day][meal].items}
+                          onChange={(e) =>
+                            updateWeeklyField(day, meal, "items", e.target.value)
+                          }
+                        />
+
+                        <input
+                          className="input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder={`${meal} price`}
+                          value={weeklyItems[day][meal].price}
+                          onChange={(e) =>
+                            updateWeeklyField(day, meal, "price", e.target.value)
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+
+            <button className="btn btnBlue" type="submit">
+              {editingWeeklyId ? "Update Weekly Menu" : "Save Weekly Menu"}
+            </button>
+          </form>
+        </div>
+      ) : null}
+
+      <div className="card">
+        <div className="menuSearchHeader">
+          <div>
+            <h2>Weekly Menu List</h2>
+            <p className="muted">
+              Search by day name, date, item, or price. Example: Monday, 24-03-2026, Lunch
+            </p>
+          </div>
+        </div>
+
+        <input
+          className="input menuSearchInput"
+          placeholder="Search weekly menu by day or date..."
+          value={weeklySearch}
+          onChange={(e) => setWeeklySearch(e.target.value)}
+        />
+
+        {weeklyLoading ? (
+          <p className="muted">Loading weekly menu...</p>
+        ) : filteredWeeklyMenus.length === 0 ? (
+          <p className="muted">
+            {weeklySearch.trim()
+              ? "No weekly menu found for this search."
+              : "No weekly menu found."}
+          </p>
         ) : (
-          <ul className="muted">
-            {list.map((m) => (
-              <li key={m.id} style={{ marginBottom: "10px" }}>
-                <b>{m.date}</b> • {m.meal_type} → {m.items}
-              </li>
-            ))}
-          </ul>
+          <div className="weeklyDisplayWrap">
+            {filteredWeeklyMenus.map((menu) => {
+              const weekDates = getWeekDateMap(menu.week_start);
+
+              const visibleDays = DAYS.filter((day) => {
+                const q = weeklySearch.trim().toLowerCase();
+                if (!q) return true;
+
+                const dayDate = String(weekDates[day] || "").toLowerCase();
+                const mealsText = MEALS.map((meal) => {
+                  const entry = menu.weekly_items?.[day]?.[meal] || {};
+                  return `${meal} ${entry.items || ""} ${entry.price ?? ""}`;
+                })
+                  .join(" ")
+                  .toLowerCase();
+
+                const haystack = `${day.toLowerCase()} ${dayDate} ${mealsText}`;
+                return haystack.includes(q);
+              });
+
+              return (
+                <div key={menu.id} className="weeklyDisplayCard">
+                  <div className="weeklyDisplayHeader">
+                    <div>
+                      <h3>Week Start: {menu.week_start}</h3>
+                      <p className="muted">
+                        Updated: {menu.updated_at ? formatDate(menu.updated_at) : "-"}
+                      </p>
+                    </div>
+
+                    {canManage ? (
+                      <div className="row">
+                        <button
+                          className="btn btnBlue"
+                          type="button"
+                          onClick={() => editWeeklyMenu(menu)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="btn btnRed"
+                          type="button"
+                          onClick={() => deleteWeeklyMenu(menu.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="weeklyDisplayGrid">
+                    {visibleDays.map((day) => (
+                      <div key={day} className="weeklyDisplayDay">
+                        <h4>
+                          {day}
+                          <span className="menuDayDate">{weekDates[day]}</span>
+                        </h4>
+
+                        {MEALS.map((meal) => {
+                          const entry = menu.weekly_items?.[day]?.[meal] || {
+                            items: "",
+                            price: "",
+                          };
+
+                          return (
+                            <div key={meal} className="weeklyDisplayMeal">
+                              <strong>{meal}</strong>
+                              <p>{entry.items || "-"}</p>
+                              <span className="weeklyPriceTag">
+                                ₹ {entry.price !== "" && entry.price !== null ? entry.price : 0}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>
   );
+}
+
+function getCurrentWeekStart() {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diff);
+  return monday.toISOString().slice(0, 10);
+}
+
+function formatDate(value) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString();
+}
+
+function getWeekDateMap(weekStart) {
+  const result = {};
+  const start = new Date(weekStart);
+
+  if (Number.isNaN(start.getTime())) {
+    DAYS.forEach((day) => {
+      result[day] = "";
+    });
+    return result;
+  }
+
+  DAYS.forEach((day, index) => {
+    const current = new Date(start);
+    current.setDate(start.getDate() + index);
+    result[day] = formatShortDate(current);
+  });
+
+  return result;
+}
+
+function formatShortDate(dateObj) {
+  const dd = String(dateObj.getDate()).padStart(2, "0");
+  const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const yyyy = dateObj.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
 }

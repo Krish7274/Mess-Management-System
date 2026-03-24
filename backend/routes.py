@@ -17,6 +17,7 @@ from models import (
     Notification,
     EmailOTP,
     Menu,
+    WeeklyMenu,
     Attendance,
     Inventory,
     Complaint,
@@ -37,9 +38,6 @@ def generate_temp_password(length=10):
     return "".join(random.choice(chars) for _ in range(length))
 
 
-# -----------------------------
-# ROLE CHECK
-# -----------------------------
 def require_roles(*roles):
     def wrapper():
         claims = get_jwt()
@@ -47,9 +45,25 @@ def require_roles(*roles):
     return wrapper
 
 
-# -----------------------------
-# SEND OTP
-# -----------------------------
+def parse_flexible_date(date_str):
+    date_str = (date_str or "").strip()
+    if not date_str:
+        raise ValueError("Empty date")
+
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            pass
+
+    raise ValueError(f"Invalid date format: {date_str}")
+
+
+def normalize_to_iso_date(date_str):
+    dt = parse_flexible_date(date_str)
+    return dt.strftime("%Y-%m-%d")
+
+
 @api.post("/auth/send-otp")
 def send_otp():
     try:
@@ -85,9 +99,6 @@ def send_otp():
         return jsonify({"error": "Failed to send OTP"}), 500
 
 
-# -----------------------------
-# REGISTER WITH OTP
-# -----------------------------
 @api.post("/auth/register")
 def register():
     try:
@@ -137,9 +148,6 @@ def register():
         return jsonify({"error": "Registration failed"}), 500
 
 
-# -----------------------------
-# LOGIN
-# -----------------------------
 @api.post("/auth/login")
 def login():
     try:
@@ -182,9 +190,6 @@ def login():
         return jsonify({"error": "Login failed"}), 500
 
 
-# -----------------------------
-# CHANGE PASSWORD AFTER LOGIN
-# -----------------------------
 @api.post("/auth/change-password")
 @jwt_required()
 def change_password():
@@ -247,9 +252,6 @@ def change_password():
         return jsonify({"error": "Failed to change password"}), 500
 
 
-# -----------------------------
-# GET CURRENT USER
-# -----------------------------
 @api.get("/users/me")
 @jwt_required()
 def me():
@@ -267,9 +269,6 @@ def me():
     })
 
 
-# -----------------------------
-# UPDATE CURRENT USER PROFILE
-# -----------------------------
 @api.put("/users/me")
 @jwt_required()
 def update_me():
@@ -311,11 +310,6 @@ def update_me():
         return jsonify({"error": "Failed to update profile"}), 500
 
 
-# -----------------------------
-# ADD USER (ADMIN / STAFF ONLY)
-# Admin/Staff create by email, temp password is auto-generated
-# Staff can create only User
-# -----------------------------
 @api.post("/users")
 @jwt_required()
 def add_user():
@@ -343,9 +337,6 @@ def add_user():
 
         if creator_role == "Admin" and new_role not in ["Admin", "Staff", "User"]:
             return jsonify({"error": "Role must be Admin, Staff, or User"}), 400
-
-        if creator_role not in ["Admin", "Staff"]:
-            return jsonify({"error": "Forbidden"}), 403
 
         existing = User.query.filter_by(email=email).first()
         if existing:
@@ -390,9 +381,6 @@ def add_user():
         return jsonify({"error": "Failed to add user"}), 500
 
 
-# -----------------------------
-# GET ALL USERS (ADMIN / STAFF)
-# -----------------------------
 @api.get("/users")
 @jwt_required()
 def list_users():
@@ -415,9 +403,6 @@ def list_users():
     ]), 200
 
 
-# -----------------------------
-# UPDATE USER ROLE (ADMIN ONLY)
-# -----------------------------
 @api.put("/users/<int:user_id>/role")
 @jwt_required()
 def update_user_role(user_id):
@@ -459,9 +444,6 @@ def update_user_role(user_id):
         return jsonify({"error": "Failed to update role"}), 500
 
 
-# -----------------------------
-# DELETE USER (ADMIN ONLY)
-# -----------------------------
 @api.delete("/users/<int:user_id>")
 @jwt_required()
 def delete_user(user_id):
@@ -506,14 +488,10 @@ def delete_user(user_id):
         return jsonify({"error": "Failed to delete user"}), 500
 
 
-# -----------------------------
-# MENU
-# -----------------------------
 @api.get("/menu")
 @jwt_required()
 def get_menu():
     items = Menu.query.order_by(Menu.id.desc()).all()
-
     return jsonify([
         {
             "id": m.id,
@@ -534,21 +512,24 @@ def add_menu():
     try:
         data = request.get_json() or {}
 
-        date = (data.get("date") or "").strip()
+        date = normalize_to_iso_date(data.get("date"))
         meal_type = (data.get("meal_type") or "").strip()
         items = (data.get("items") or "").strip()
 
         if not date or not meal_type or not items:
-            return jsonify({"error": "date, meal_type, items required"}), 400
+            return jsonify({"error": "date, meal_type and items are required"}), 400
 
         if meal_type not in ["Breakfast", "Lunch", "Dinner"]:
             return jsonify({"error": "meal_type must be Breakfast/Lunch/Dinner"}), 400
 
-        menu = Menu(
-            date=date,
-            meal_type=meal_type,
-            items=items
-        )
+        existing = Menu.query.filter_by(date=date, meal_type=meal_type).first()
+
+        if existing:
+            existing.items = items
+            db.session.commit()
+            return jsonify({"message": "Menu updated successfully"}), 200
+
+        menu = Menu(date=date, meal_type=meal_type, items=items)
         db.session.add(menu)
         db.session.commit()
 
@@ -557,12 +538,283 @@ def add_menu():
     except Exception as e:
         db.session.rollback()
         print("MENU ERROR:", e)
-        return jsonify({"error": "Failed to add menu"}), 500
+        return jsonify({"error": "Failed to save menu"}), 500
 
 
-# -----------------------------
-# ATTENDANCE
-# -----------------------------
+@api.delete("/menu/<int:menu_id>")
+@jwt_required()
+def delete_menu(menu_id):
+    if not require_roles("Admin", "Staff")():
+        return jsonify({"error": "Forbidden"}), 403
+
+    try:
+        menu = Menu.query.get_or_404(menu_id)
+        db.session.delete(menu)
+        db.session.commit()
+        return jsonify({"message": "Menu deleted successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        print("DELETE MENU ERROR:", e)
+        return jsonify({"error": "Failed to delete menu"}), 500
+
+
+def default_weekly_structure():
+    days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    meals = ["Breakfast", "Lunch", "Dinner"]
+
+    data = {}
+    for day in days:
+        data[day] = {}
+        for meal in meals:
+            data[day][meal] = {
+                "items": "",
+                "price": 0
+            }
+    return data
+
+
+def normalize_weekly_items(raw):
+    base = default_weekly_structure()
+    raw = raw or {}
+
+    for day, meals in base.items():
+        incoming_day = raw.get(day, {})
+        for meal in meals:
+            incoming_meal = incoming_day.get(meal, {})
+            items = (incoming_meal.get("items") or "").strip()
+
+            try:
+                price = float(incoming_meal.get("price", 0) or 0)
+            except Exception:
+                price = 0
+
+            if price < 0:
+                price = 0
+
+            base[day][meal] = {
+                "items": items,
+                "price": round(price, 2)
+            }
+
+    return base
+
+
+def serialize_weekly_menu(menu):
+    return {
+        "id": menu.id,
+        "week_start": menu.week_start,
+        "weekly_items": menu.weekly_items,
+        "created_at": menu.created_at.isoformat() if menu.created_at else None,
+        "updated_at": menu.updated_at.isoformat() if menu.updated_at else None
+    }
+
+
+def get_week_start_from_date(date_str):
+    dt = parse_flexible_date(date_str)
+    day = dt.weekday()
+    monday = dt - timedelta(days=day)
+    return monday.strftime("%Y-%m-%d")
+
+
+def get_day_name_from_date(date_str):
+    dt = parse_flexible_date(date_str)
+    return dt.strftime("%A")
+
+
+def get_meal_price_from_weekly_menu(date_str, meal_type):
+    week_start = get_week_start_from_date(date_str)
+    day_name = get_day_name_from_date(date_str)
+
+    weekly_menu = WeeklyMenu.query.filter_by(week_start=week_start).first()
+    if not weekly_menu:
+        return None, f"No weekly menu found for week starting {week_start}"
+
+    weekly_items = weekly_menu.weekly_items or {}
+    day_block = weekly_items.get(day_name, {})
+    meal_block = day_block.get(meal_type, {})
+
+    try:
+        price = float(meal_block.get("price", 0) or 0)
+    except Exception:
+        price = 0
+
+    if price <= 0:
+        return None, f"No valid price found for {day_name} {meal_type}"
+
+    return round(price, 2), None
+
+
+def sync_attendance_bill(attendance_row):
+    if attendance_row.status == "Taken":
+        meal_price, error = get_meal_price_from_weekly_menu(
+            attendance_row.date,
+            attendance_row.meal_type
+        )
+        if error:
+            return False, error
+
+        existing_bill = Bill.query.filter_by(
+            attendance_id=attendance_row.id
+        ).first()
+
+        if existing_bill:
+            existing_bill.user_id = attendance_row.user_id
+            existing_bill.month = attendance_row.date
+            existing_bill.bill_type = "daily"
+            existing_bill.meal_type = attendance_row.meal_type
+            existing_bill.attendance_id = attendance_row.id
+            existing_bill.amount = meal_price
+            return True, "Attendance bill updated"
+
+        new_bill = Bill(
+            user_id=attendance_row.user_id,
+            month=attendance_row.date,
+            bill_type="daily",
+            meal_type=attendance_row.meal_type,
+            attendance_id=attendance_row.id,
+            amount=meal_price,
+            status="Unpaid"
+        )
+        db.session.add(new_bill)
+
+        user = User.query.get(attendance_row.user_id)
+        if user:
+            notification = Notification(
+                user_id=user.id,
+                title="Meal Bill Generated",
+                message=f"{attendance_row.meal_type} bill for {attendance_row.date} generated: ₹{meal_price}"
+            )
+            db.session.add(notification)
+
+            if user.email:
+                try:
+                    send_bill_email(
+                        user.email,
+                        user.name,
+                        f"{attendance_row.meal_type} Meal",
+                        attendance_row.date,
+                        meal_price
+                    )
+                except Exception as mail_error:
+                    print("AUTO ATTENDANCE BILL EMAIL ERROR:", mail_error)
+
+        return True, "Attendance bill created"
+
+    existing_bill = Bill.query.filter_by(attendance_id=attendance_row.id).first()
+    if existing_bill:
+        if existing_bill.status == "Paid":
+            return False, "Bill already paid, cannot auto-delete it after skipping attendance"
+        Payment.query.filter_by(bill_id=existing_bill.id).delete()
+        db.session.delete(existing_bill)
+
+    return True, "Attendance bill removed"
+
+
+@api.get("/menu/weekly")
+@jwt_required()
+def get_weekly_menus():
+    menus = WeeklyMenu.query.order_by(WeeklyMenu.week_start.desc()).all()
+    return jsonify([serialize_weekly_menu(m) for m in menus])
+
+
+@api.post("/menu/weekly")
+@jwt_required()
+def create_weekly_menu():
+    if not require_roles("Admin", "Staff")():
+        return jsonify({"error": "Forbidden"}), 403
+
+    try:
+        data = request.get_json() or {}
+        week_start = normalize_to_iso_date(data.get("week_start"))
+        weekly_items = data.get("weekly_items") or {}
+
+        if not week_start:
+            return jsonify({"error": "week_start is required"}), 400
+
+        normalized = normalize_weekly_items(weekly_items)
+
+        existing = WeeklyMenu.query.filter_by(week_start=week_start).first()
+        if existing:
+            existing.weekly_items = normalized
+            db.session.commit()
+            return jsonify({
+                "message": "Weekly menu updated successfully",
+                "menu": serialize_weekly_menu(existing)
+            }), 200
+
+        menu = WeeklyMenu(
+            week_start=week_start,
+            weekly_items=normalized
+        )
+        db.session.add(menu)
+        db.session.commit()
+
+        return jsonify({
+            "message": "Weekly menu created successfully",
+            "menu": serialize_weekly_menu(menu)
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        print("CREATE WEEKLY MENU ERROR:", e)
+        return jsonify({"error": "Failed to create weekly menu"}), 500
+
+
+@api.put("/menu/weekly/<int:menu_id>")
+@jwt_required()
+def update_weekly_menu(menu_id):
+    if not require_roles("Admin", "Staff")():
+        return jsonify({"error": "Forbidden"}), 403
+
+    try:
+        menu = WeeklyMenu.query.get_or_404(menu_id)
+        data = request.get_json() or {}
+
+        week_start = normalize_to_iso_date(data.get("week_start"))
+        weekly_items = data.get("weekly_items") or {}
+
+        if not week_start:
+            return jsonify({"error": "week_start is required"}), 400
+
+        duplicate = WeeklyMenu.query.filter(
+            WeeklyMenu.week_start == week_start,
+            WeeklyMenu.id != menu_id
+        ).first()
+        if duplicate:
+            return jsonify({"error": "Another weekly menu already exists for this week start"}), 400
+
+        menu.week_start = week_start
+        menu.weekly_items = normalize_weekly_items(weekly_items)
+        db.session.commit()
+
+        return jsonify({
+            "message": "Weekly menu updated successfully",
+            "menu": serialize_weekly_menu(menu)
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print("UPDATE WEEKLY MENU ERROR:", e)
+        return jsonify({"error": "Failed to update weekly menu"}), 500
+
+
+@api.delete("/menu/weekly/<int:menu_id>")
+@jwt_required()
+def delete_weekly_menu(menu_id):
+    if not require_roles("Admin", "Staff")():
+        return jsonify({"error": "Forbidden"}), 403
+
+    try:
+        menu = WeeklyMenu.query.get_or_404(menu_id)
+        db.session.delete(menu)
+        db.session.commit()
+        return jsonify({"message": "Weekly menu deleted successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        print("DELETE WEEKLY MENU ERROR:", e)
+        return jsonify({"error": "Failed to delete weekly menu"}), 500
+
+
 @api.get("/attendance")
 @jwt_required()
 def attendance_list():
@@ -578,7 +830,12 @@ def attendance_list():
         q = q.filter_by(user_id=uid)
 
     if date:
+        try:
+            date = normalize_to_iso_date(date)
+        except Exception:
+            return jsonify({"error": "Invalid date format"}), 400
         q = q.filter_by(date=date)
+
     if meal_type:
         q = q.filter_by(meal_type=meal_type)
 
@@ -605,7 +862,7 @@ def mark_attendance():
         role = get_jwt().get("role")
         logged_in_uid = int(get_jwt_identity())
 
-        date = (data.get("date") or "").strip()
+        date = normalize_to_iso_date(data.get("date"))
         meal_type = (data.get("meal_type") or "").strip()
         status = (data.get("status") or "").strip()
 
@@ -634,8 +891,16 @@ def mark_attendance():
 
         if existing:
             existing.status = status
+            ok, billing_message = sync_attendance_bill(existing)
+            if not ok:
+                db.session.rollback()
+                return jsonify({"error": billing_message}), 400
+
             db.session.commit()
-            return jsonify({"message": "Attendance updated successfully"}), 200
+            return jsonify({
+                "message": "Attendance updated successfully",
+                "billing_message": billing_message
+            }), 200
 
         new_attendance = Attendance(
             user_id=target_user_id,
@@ -644,9 +909,19 @@ def mark_attendance():
             status=status
         )
         db.session.add(new_attendance)
+        db.session.flush()
+
+        ok, billing_message = sync_attendance_bill(new_attendance)
+        if not ok:
+            db.session.rollback()
+            return jsonify({"error": billing_message}), 400
+
         db.session.commit()
 
-        return jsonify({"message": "Attendance saved successfully"}), 201
+        return jsonify({
+            "message": "Attendance saved successfully",
+            "billing_message": billing_message
+        }), 201
 
     except Exception as e:
         db.session.rollback()
@@ -654,24 +929,64 @@ def mark_attendance():
         return jsonify({"error": "Failed to save attendance"}), 500
 
 
-# -----------------------------
-# INVENTORY
-# -----------------------------
+def inventory_status(item):
+    qty = float(item.qty or 0)
+    low_limit = float(item.low_limit or 0)
+
+    if qty <= 0:
+        return "Out of Stock"
+    if qty <= low_limit:
+        return "Low Stock"
+    return "In Stock"
+
+
+def serialize_inventory(item):
+    qty = float(item.qty or 0)
+    price_per_unit = float(item.price_per_unit or 0)
+
+    return {
+        "id": item.id,
+        "category": item.category,
+        "name": item.name,
+        "unit": item.unit,
+        "qty": qty,
+        "low_limit": float(item.low_limit or 0),
+        "price_per_unit": price_per_unit,
+        "total_value": round(qty * price_per_unit, 2),
+        "status": inventory_status(item),
+        "low": qty > 0 and qty <= float(item.low_limit or 0),
+        "updated_at": item.updated_at.isoformat() if item.updated_at else None
+    }
+
+
 @api.get("/inventory")
 @jwt_required()
 def get_inventory():
     items = Inventory.query.order_by(Inventory.id.desc()).all()
+    return jsonify([serialize_inventory(i) for i in items])
 
-    return jsonify([
-        {
-            "id": i.id,
-            "category": i.category,
-            "name": i.name,
-            "qty": i.qty,
-            "low_limit": i.low_limit
-        }
-        for i in items
-    ])
+
+@api.get("/inventory/summary")
+@jwt_required()
+def inventory_summary():
+    items = Inventory.query.all()
+
+    total_items = len(items)
+    total_quantity = round(sum(float(i.qty or 0) for i in items), 2)
+    low_stock = sum(1 for i in items if inventory_status(i) == "Low Stock")
+    out_of_stock = sum(1 for i in items if inventory_status(i) == "Out of Stock")
+    total_value = round(
+        sum(float(i.qty or 0) * float(i.price_per_unit or 0) for i in items),
+        2
+    )
+
+    return jsonify({
+        "total_items": total_items,
+        "total_quantity": total_quantity,
+        "low_stock": low_stock,
+        "out_of_stock": out_of_stock,
+        "total_value": total_value
+    })
 
 
 @api.post("/inventory")
@@ -685,38 +1000,158 @@ def add_inventory():
 
         category = (data.get("category") or "").strip()
         name = (data.get("name") or "").strip()
-        qty = data.get("qty")
-        low_limit = data.get("low_limit")
+        unit = (data.get("unit") or "kg").strip()
 
         if not category or not name:
             return jsonify({"error": "category and name required"}), 400
 
         try:
-            qty = float(qty if qty is not None else 0)
-            low_limit = float(low_limit if low_limit is not None else 5)
+            qty = float(data.get("qty", 0) or 0)
+            low_limit = float(data.get("low_limit", 5) or 5)
+            price_per_unit = float(data.get("price_per_unit", 0) or 0)
         except Exception:
-            return jsonify({"error": "qty and low_limit must be numbers"}), 400
+            return jsonify({"error": "qty, low_limit and price_per_unit must be numbers"}), 400
+
+        if qty < 0 or low_limit < 0 or price_per_unit < 0:
+            return jsonify({"error": "qty, low_limit and price_per_unit cannot be negative"}), 400
+
+        existing = Inventory.query.filter(
+            db.func.lower(Inventory.category) == category.lower(),
+            db.func.lower(Inventory.name) == name.lower()
+        ).first()
+
+        if existing:
+            existing.unit = unit
+            existing.qty = qty
+            existing.low_limit = low_limit
+            existing.price_per_unit = price_per_unit
+            db.session.commit()
+            return jsonify({
+                "message": "Inventory item updated successfully",
+                "item": serialize_inventory(existing)
+            }), 200
 
         item = Inventory(
             category=category,
             name=name,
+            unit=unit,
             qty=qty,
-            low_limit=low_limit
+            low_limit=low_limit,
+            price_per_unit=price_per_unit
         )
         db.session.add(item)
         db.session.commit()
 
-        return jsonify({"message": "Inventory added successfully"}), 201
+        return jsonify({
+            "message": "Inventory added successfully",
+            "item": serialize_inventory(item)
+        }), 201
 
     except Exception as e:
         db.session.rollback()
-        print("INVENTORY ERROR:", e)
+        print("INVENTORY ADD ERROR:", e)
         return jsonify({"error": "Failed to add inventory"}), 500
 
 
-# -----------------------------
-# COMPLAINTS
-# -----------------------------
+@api.put("/inventory/<int:item_id>")
+@jwt_required()
+def update_inventory(item_id):
+    if not require_roles("Admin", "Staff")():
+        return jsonify({"error": "Forbidden"}), 403
+
+    try:
+        item = Inventory.query.get_or_404(item_id)
+        data = request.get_json() or {}
+
+        category = (data.get("category") or "").strip()
+        name = (data.get("name") or "").strip()
+        unit = (data.get("unit") or "kg").strip()
+
+        if not category or not name:
+            return jsonify({"error": "category and name required"}), 400
+
+        try:
+            qty = float(data.get("qty", 0) or 0)
+            low_limit = float(data.get("low_limit", 5) or 5)
+            price_per_unit = float(data.get("price_per_unit", 0) or 0)
+        except Exception:
+            return jsonify({"error": "qty, low_limit and price_per_unit must be numbers"}), 400
+
+        if qty < 0 or low_limit < 0 or price_per_unit < 0:
+            return jsonify({"error": "qty, low_limit and price_per_unit cannot be negative"}), 400
+
+        item.category = category
+        item.name = name
+        item.unit = unit
+        item.qty = qty
+        item.low_limit = low_limit
+        item.price_per_unit = price_per_unit
+
+        db.session.commit()
+
+        return jsonify({
+            "message": "Inventory updated successfully",
+            "item": serialize_inventory(item)
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print("INVENTORY UPDATE ERROR:", e)
+        return jsonify({"error": "Failed to update inventory"}), 500
+
+
+@api.patch("/inventory/<int:item_id>/adjust")
+@jwt_required()
+def adjust_inventory(item_id):
+    if not require_roles("Admin", "Staff")():
+        return jsonify({"error": "Forbidden"}), 403
+
+    try:
+        item = Inventory.query.get_or_404(item_id)
+        data = request.get_json() or {}
+
+        try:
+            qty_delta = float(data.get("qty_delta", 0) or 0)
+        except Exception:
+            return jsonify({"error": "qty_delta must be a number"}), 400
+
+        new_qty = float(item.qty or 0) + qty_delta
+        if new_qty < 0:
+            new_qty = 0
+
+        item.qty = new_qty
+        db.session.commit()
+
+        return jsonify({
+            "message": "Inventory quantity updated successfully",
+            "item": serialize_inventory(item)
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print("INVENTORY ADJUST ERROR:", e)
+        return jsonify({"error": "Failed to update inventory quantity"}), 500
+
+
+@api.delete("/inventory/<int:item_id>")
+@jwt_required()
+def delete_inventory(item_id):
+    if not require_roles("Admin", "Staff")():
+        return jsonify({"error": "Forbidden"}), 403
+
+    try:
+        item = Inventory.query.get_or_404(item_id)
+        db.session.delete(item)
+        db.session.commit()
+
+        return jsonify({"message": "Inventory deleted successfully"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print("INVENTORY DELETE ERROR:", e)
+        return jsonify({"error": "Failed to delete inventory"}), 500
+
+
 @api.get("/complaints")
 @jwt_required()
 def get_complaints():
@@ -797,9 +1232,6 @@ def update_complaint_status(cid):
         return jsonify({"error": "Failed to update complaint status"}), 500
 
 
-# -----------------------------
-# NOTIFICATIONS
-# -----------------------------
 @api.get("/notifications")
 @jwt_required()
 def get_notifications():
@@ -871,9 +1303,6 @@ def add_notification():
         return jsonify({"error": "Failed to create notification"}), 500
 
 
-# -----------------------------
-# CREATE BILL (ADMIN)
-# -----------------------------
 @api.post("/billing/create")
 @jwt_required()
 def create_bill():
@@ -897,6 +1326,8 @@ def create_bill():
         try:
             user_id = int(user_id)
             amount = float(amount)
+            if bill_type == "daily":
+                period = normalize_to_iso_date(period)
         except Exception:
             return jsonify({"error": "user_id and amount must be valid numbers"}), 400
 
@@ -917,6 +1348,8 @@ def create_bill():
             user_id=user_id,
             month=period,
             bill_type=bill_type,
+            meal_type=None,
+            attendance_id=None,
             amount=amount,
             status="Unpaid"
         )
@@ -953,6 +1386,8 @@ def create_bill():
                 "user_name": user.name,
                 "user_email": user.email,
                 "bill_type": bill.bill_type,
+                "meal_type": bill.meal_type,
+                "attendance_id": bill.attendance_id,
                 "period": bill.month,
                 "amount": bill.amount,
                 "status": bill.status
@@ -965,9 +1400,6 @@ def create_bill():
         return jsonify({"error": "Bill creation failed"}), 500
 
 
-# -----------------------------
-# GET MY BILLS
-# -----------------------------
 @api.get("/billing/my")
 @jwt_required()
 def my_bills():
@@ -982,6 +1414,8 @@ def my_bills():
             result.append({
                 "id": b.id,
                 "bill_type": b.bill_type,
+                "meal_type": b.meal_type,
+                "attendance_id": b.attendance_id,
                 "period": b.month,
                 "amount": b.amount,
                 "status": b.status,
@@ -1000,9 +1434,6 @@ def my_bills():
         return jsonify({"error": "Failed to load my bills"}), 500
 
 
-# -----------------------------
-# ALL USERS BILL (ADMIN)
-# -----------------------------
 @api.get("/billing/all")
 @jwt_required()
 def all_bills():
@@ -1023,6 +1454,8 @@ def all_bills():
                 "user_name": user.name if user else "Unknown",
                 "user_email": user.email if user else "Unknown",
                 "bill_type": b.bill_type,
+                "meal_type": b.meal_type,
+                "attendance_id": b.attendance_id,
                 "period": b.month,
                 "amount": b.amount,
                 "status": b.status,
@@ -1041,9 +1474,6 @@ def all_bills():
         return jsonify({"error": "Failed to load all bills"}), 500
 
 
-# -----------------------------
-# PAY BILL
-# -----------------------------
 @api.post("/billing/pay")
 @jwt_required()
 def pay_bill():
@@ -1104,6 +1534,7 @@ def pay_bill():
                 "receipt_no": receipt_no,
                 "bill_id": bill.id,
                 "bill_type": bill.bill_type,
+                "meal_type": bill.meal_type,
                 "period": bill.month,
                 "amount": bill.amount,
                 "mode": mode,
@@ -1118,9 +1549,6 @@ def pay_bill():
         return jsonify({"error": "Failed to update payment"}), 500
 
 
-# -----------------------------
-# GET RECEIPT BY BILL ID
-# -----------------------------
 @api.get("/billing/receipt/<int:bill_id>")
 @jwt_required()
 def get_receipt(bill_id):
@@ -1141,6 +1569,7 @@ def get_receipt(bill_id):
             "receipt_no": payment.receipt_no,
             "bill_id": bill.id,
             "bill_type": bill.bill_type,
+            "meal_type": bill.meal_type,
             "period": bill.month,
             "amount": bill.amount,
             "mode": payment.mode,

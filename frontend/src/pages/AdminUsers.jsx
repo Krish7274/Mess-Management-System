@@ -25,6 +25,7 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  const [search, setSearch] = useState("");
 
   const [form, setForm] = useState({
     name: "",
@@ -163,9 +164,30 @@ export default function AdminUsers() {
     }
   }
 
-  const normalUsers = users.filter((u) => u.role === "User");
-  const staffUsers = users.filter((u) => u.role === "Staff");
-  const adminUsers = users.filter((u) => u.role === "Admin");
+  const filteredUsers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return users;
+
+    return users.filter((u) => {
+      const text = [
+        u.name,
+        u.email,
+        u.role,
+        u.room_no,
+        u.contact,
+        u.must_change_password ? "pending change" : "changed",
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return text.includes(q);
+    });
+  }, [users, search]);
+
+  const normalUsers = filteredUsers.filter((u) => u.role === "User");
+  const staffUsers = filteredUsers.filter((u) => u.role === "Staff");
+  const adminUsers = filteredUsers.filter((u) => u.role === "Admin");
 
   function renderTableRows(list) {
     return list.map((u) => (
@@ -179,7 +201,7 @@ export default function AdminUsers() {
 
         {canChangeRole && (
           <td>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <select
                 className="input"
                 style={{ margin: 0 }}
@@ -316,9 +338,27 @@ export default function AdminUsers() {
         </div>
       )}
 
-        <div>
+      <div>
+        <div className="card">
+          <div className="searchBarWrap">
+            <div>
+              <h3 style={{ marginBottom: 6 }}>Search Users</h3>
+              <p className="muted" style={{ marginBottom: 0 }}>
+                Search by name, email, role, room, or contact
+              </p>
+            </div>
+
+            <input
+              className="input searchInput"
+              placeholder="Search user..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+
         {loading ? (
-          <div className="card">
+          <div className="card" style={{ marginTop: 18 }}>
             <h3>Users List</h3>
             <p>Loading users...</p>
           </div>

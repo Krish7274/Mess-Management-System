@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../api";
 import { getUser } from "../auth";
 import upiQr from "../assets/upi-qr.jpeg";
@@ -10,6 +10,8 @@ export default function Billing() {
   const [myBills, setMyBills] = useState([]);
   const [allBills, setAllBills] = useState([]);
   const [users, setUsers] = useState([]);
+  const [billingSearch, setBillingSearch] = useState("");
+
   const [form, setForm] = useState({
     user_id: "",
     bill_type: "monthly",
@@ -108,6 +110,7 @@ export default function Billing() {
     setSelectedBillAmount(amount);
     setPaymentProof(null);
     setPaymentNote("");
+    setReceiptData(null);
     setPaymentSuccess(false);
     setPaymentSuccessMessage("");
     setShowQrModal(true);
@@ -119,41 +122,46 @@ export default function Billing() {
     setSelectedBillAmount("");
     setPaymentProof(null);
     setPaymentNote("");
+    setReceiptData(null);
     setPaymentSuccess(false);
     setPaymentSuccessMessage("");
   }
 
   async function markBillPaid() {
-    setMsg("");
-    setErr("");
-
-    if (!selectedBillId) {
-      setErr("No bill selected");
-      return;
-    }
-
     try {
+      setErr("");
+
+      if (!selectedBillId) {
+        setErr("No bill selected");
+        return;
+      }
+
       const formData = new FormData();
       formData.append("bill_id", selectedBillId);
       formData.append("mode", "UPI");
-      formData.append("note", paymentNote);
+      formData.append("note", paymentNote || "");
 
       if (paymentProof) {
         formData.append("proof", paymentProof);
       }
 
-      const res = await api.post("/billing/pay", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+      await api.post("/billing/pay", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       });
 
-      setMsg(res.data?.message || "Payment recorded successfully");
-      setReceiptData(res.data?.receipt || null);
+      const receiptRes = await api.get(`/billing/receipt/${selectedBillId}`);
+      const receipt = receiptRes.data || null;
+
+      setReceiptData(receipt);
       setPaymentSuccess(true);
-      setPaymentSuccessMessage("✅ Payment screenshot uploaded and bill marked as paid successfully.");
+      setPaymentSuccessMessage("Payment recorded successfully");
 
       loadMyBills();
       loadAllBills();
     } catch (e) {
+      console.error("PAYMENT ERROR:", e);
       setErr(e?.response?.data?.error || "Failed to update payment");
     }
   }
@@ -188,14 +196,46 @@ Thank you for your payment.
     window.URL.revokeObjectURL(url);
   }
 
+  const filteredAllBills = useMemo(() => {
+    const q = billingSearch.trim().toLowerCase();
+    if (!q) return allBills;
+
+    return allBills.filter((bill) => {
+      const text = [
+        bill.user_name,
+        bill.user_email,
+        bill.bill_type === "daily" ? "Daily" : "Monthly",
+        bill.period,
+        bill.month,
+        bill.amount,
+        bill.status,
+        bill.payment?.mode,
+        bill.payment?.receipt_no,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return text.includes(q);
+    });
+  }, [allBills, billingSearch]);
+
   return (
     <div className="grid">
       <div className="card">
         <h1>My Bills</h1>
 
-        {msg && <div className="badge" style={{ marginBottom: 12 }}>{msg}</div>}
+        {msg && (
+          <div className="badge" style={{ marginBottom: 12 }}>
+            {msg}
+          </div>
+        )}
+
         {err && (
-          <div className="card" style={{ borderColor: "rgba(239,68,68,.35)", marginBottom: 12 }}>
+          <div
+            className="card"
+            style={{ borderColor: "rgba(239,68,68,.35)", marginBottom: 12 }}
+          >
             {err}
           </div>
         )}
@@ -206,7 +246,8 @@ Thank you for your payment.
           <ul className="muted">
             {myBills.map((b) => (
               <li key={b.id} style={{ marginBottom: 14 }}>
-                {(b.period || b.month)} • {b.bill_type === "daily" ? "Daily" : "Monthly"} • ₹{b.amount} • <b>{b.status}</b>{" "}
+                {(b.period || b.month)} • {b.bill_type === "daily" ? "Daily" : "Monthly"} • ₹{b.amount} •{" "}
+                <b>{b.status}</b>
                 {b.status !== "Paid" && (
                   <button
                     className="btn btnBlue"
@@ -300,15 +341,32 @@ Thank you for your payment.
 
       {isAdmin && (
         <div className="card" style={{ gridColumn: "1 / -1" }}>
-          <h1>All Users Billing List</h1>
+          <div className="searchBarWrap" style={{ marginBottom: 14 }}>
+            <div>
+              <h1 style={{ marginBottom: 6 }}>All Users Billing List</h1>
+              <p className="muted" style={{ marginBottom: 0 }}>
+                Search by user name, email, bill type, period, amount, or status
+              </p>
+            </div>
+
+            <input
+              className="input searchInput"
+              placeholder="Search billing user..."
+              value={billingSearch}
+              onChange={(e) => setBillingSearch(e.target.value)}
+            />
+          </div>
 
           {allBillsErr && (
-            <div className="card" style={{ borderColor: "rgba(239,68,68,.35)", marginBottom: 12 }}>
+            <div
+              className="card"
+              style={{ borderColor: "rgba(239,68,68,.35)", marginBottom: 12 }}
+            >
               {allBillsErr}
             </div>
           )}
 
-          {allBills.length === 0 ? (
+          {filteredAllBills.length === 0 ? (
             <p className="muted">No user bills found</p>
           ) : (
             <div style={{ overflowX: "auto" }}>
@@ -327,11 +385,13 @@ Thank you for your payment.
                   </tr>
                 </thead>
                 <tbody>
-                  {allBills.map((bill) => (
+                  {filteredAllBills.map((bill) => (
                     <tr key={bill.id}>
                       <td style={tdStyle}>{bill.user_name || "-"}</td>
                       <td style={tdStyle}>{bill.user_email || "-"}</td>
-                      <td style={tdStyle}>{bill.bill_type === "daily" ? "Daily" : "Monthly"}</td>
+                      <td style={tdStyle}>
+                        {bill.bill_type === "daily" ? "Daily" : "Monthly"}
+                      </td>
                       <td style={tdStyle}>{bill.period || bill.month || "-"}</td>
                       <td style={tdStyle}>₹{bill.amount}</td>
                       <td style={tdStyle}>
@@ -378,8 +438,12 @@ Thank you for your payment.
                 <img src={upiQr} alt="UPI QR Code" className="qrImage qrImageSmall" />
 
                 <div className="qrInfoText">
-                  <p className="muted"><b>Name:</b> Krish Patel</p>
-                  <p className="muted"><b>UPI ID:</b> ptlkrish27@oksbi</p>
+                  <p className="muted">
+                    <b>Name:</b> Krish Patel
+                  </p>
+                  <p className="muted">
+                    <b>UPI ID:</b> ptlkrish27@oksbi
+                  </p>
                 </div>
 
                 <div className="qrFormSection">
@@ -412,15 +476,24 @@ Thank you for your payment.
             ) : (
               <>
                 <h2 className="qrTitle">Payment Successful</h2>
-                <div className="card" style={{ borderColor: "rgba(34,197,94,.35)", marginBottom: 14 }}>
+                <div
+                  className="card"
+                  style={{ borderColor: "rgba(34,197,94,.35)", marginBottom: 14 }}
+                >
                   {paymentSuccessMessage}
                 </div>
 
                 {receiptData && (
                   <div className="qrInfoText">
-                    <p className="muted"><b>Receipt No:</b> {receiptData.receipt_no}</p>
-                    <p className="muted"><b>Amount:</b> ₹{receiptData.amount}</p>
-                    <p className="muted"><b>Paid At:</b> {receiptData.paid_at}</p>
+                    <p className="muted">
+                      <b>Receipt No:</b> {receiptData.receipt_no}
+                    </p>
+                    <p className="muted">
+                      <b>Amount:</b> ₹{receiptData.amount}
+                    </p>
+                    <p className="muted">
+                      <b>Paid At:</b> {receiptData.paid_at}
+                    </p>
                   </div>
                 )}
 

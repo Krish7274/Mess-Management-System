@@ -1,6 +1,6 @@
 from datetime import datetime
-from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
@@ -41,6 +41,18 @@ class Menu(db.Model):
     items = db.Column(db.Text, nullable=False)
 
 
+class WeeklyMenu(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    week_start = db.Column(db.String(20), unique=True, nullable=False)
+    weekly_items = db.Column(db.JSON, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+
+
 class Attendance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, nullable=False)
@@ -54,6 +66,8 @@ class Bill(db.Model):
     user_id = db.Column(db.Integer, nullable=False)
     month = db.Column(db.String(20), nullable=False)
     bill_type = db.Column(db.String(20), nullable=False, default="monthly")
+    meal_type = db.Column(db.String(20), nullable=True)
+    attendance_id = db.Column(db.Integer, nullable=True)
     amount = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default="Unpaid")
 
@@ -72,8 +86,15 @@ class Inventory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     category = db.Column(db.String(50), nullable=False)
     name = db.Column(db.String(120), nullable=False)
+    unit = db.Column(db.String(30), nullable=False, default="kg")
     qty = db.Column(db.Float, default=0)
     low_limit = db.Column(db.Float, default=5)
+    price_per_unit = db.Column(db.Float, default=0)
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
 
 
 class Complaint(db.Model):
