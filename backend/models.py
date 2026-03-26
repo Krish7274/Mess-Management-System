@@ -66,8 +66,9 @@ class Bill(db.Model):
     user_id = db.Column(db.Integer, nullable=False)
     month = db.Column(db.String(20), nullable=False)
     bill_type = db.Column(db.String(20), nullable=False, default="monthly")
-    meal_type = db.Column(db.String(20), nullable=True)
+    meal_type = db.Column(db.String(50), nullable=True)
     attendance_id = db.Column(db.Integer, nullable=True)
+    parent_bill_id = db.Column(db.Integer, nullable=True)
     amount = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default="Unpaid")
 

@@ -6,41 +6,40 @@ export default function Dashboard() {
   const u = getUser();
 
   const [users, setUsers] = useState([]);
-  const [todayMenu, setTodayMenu] = useState([]);
+  const [todayMenu, setTodayMenu] = useState(null);
   const [menuLoading, setMenuLoading] = useState(false);
   const [menuError, setMenuError] = useState("");
 
   useEffect(() => {
     if (u?.role === "Admin") {
-      api.get("/users")
-        .then((res) => setUsers(res.data))
+      api
+        .get("/users")
+        .then((res) => setUsers(res.data || []))
         .catch(() => {});
     } else {
-      fetchTodaysMenu();
+      fetchTodaysMenuFromWeekly();
     }
   }, []);
 
-  async function fetchTodaysMenu() {
+  async function fetchTodaysMenuFromWeekly() {
     try {
       setMenuLoading(true);
       setMenuError("");
 
       const today = new Date().toISOString().split("T")[0];
 
-      const res = await api.get("/menu");
+      const res = await api.get(`/menu/weekly/today?date=${today}`);
 
-      const allMenus = Array.isArray(res.data)
-        ? res.data
-        : Array.isArray(res.data?.items)
-        ? res.data.items
-        : [];
-
-      const filteredMenus = allMenus.filter((item) => item.date === today);
-
-      setTodayMenu(filteredMenus);
+      setTodayMenu(res.data || null);
     } catch (err) {
-      console.error("Failed to load today's menu:", err);
-      setMenuError("Could not load today's menu.");
+      console.error("Failed to load today's weekly menu:", err);
+      setTodayMenu(null);
+
+      const apiMessage =
+        err?.response?.data?.error ||
+        "Could not load today's menu from weekly menu.";
+
+      setMenuError(apiMessage);
     } finally {
       setMenuLoading(false);
     }
@@ -88,28 +87,46 @@ export default function Dashboard() {
             <>
               <h3>Today's Menu</h3>
 
-              {menuLoading && (
-                <p className="muted">Loading today's menu...</p>
-              )}
+              {menuLoading && <p className="muted">Loading today's menu...</p>}
 
               {!menuLoading && menuError && (
                 <p className="muted">{menuError}</p>
               )}
 
-              {!menuLoading && !menuError && todayMenu.length === 0 && (
+              {!menuLoading && !menuError && !todayMenu && (
                 <p className="muted">No menu added for today.</p>
               )}
 
-              {!menuLoading && !menuError && todayMenu.length > 0 && (
-                <ul className="muted">
-                  {todayMenu.map((item, index) => (
-                    <li key={item.id || index}>
-                      <strong>{item.meal_type || item.meal || "Meal"}</strong>
-                      {" → "}
-                      {item.items || item.menu_items || item.menu || item.name || "Menu Item"}
-                    </li>
-                  ))}
-                </ul>
+              {!menuLoading && !menuError && todayMenu && (
+                <div className="muted">
+                  <p>
+                    <strong>Date:</strong> {todayMenu.date}
+                  </p>
+                  <p>
+                    <strong>Day:</strong> {todayMenu.day}
+                  </p>
+                  <p>
+                    <strong>Breakfast:</strong>{" "}
+                    {todayMenu.breakfast?.items || "Not added"}
+                    {todayMenu.breakfast?.price > 0
+                      ? ` (₹${todayMenu.breakfast.price})`
+                      : ""}
+                  </p>
+                  <p>
+                    <strong>Lunch:</strong>{" "}
+                    {todayMenu.lunch?.items || "Not added"}
+                    {todayMenu.lunch?.price > 0
+                      ? ` (₹${todayMenu.lunch.price})`
+                      : ""}
+                  </p>
+                  <p>
+                    <strong>Dinner:</strong>{" "}
+                    {todayMenu.dinner?.items || "Not added"}
+                    {todayMenu.dinner?.price > 0
+                      ? ` (₹${todayMenu.dinner.price})`
+                      : ""}
+                  </p>
+                </div>
               )}
             </>
           )}

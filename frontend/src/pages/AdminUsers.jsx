@@ -1,15 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Navigate } from "react-router-dom";
 import api from "../api";
 import { getUser } from "../auth";
 
 export default function AdminUsers() {
   const currentUser = getUser();
-  const currentRole = currentUser?.role || "User";
-
-  if (!["Admin", "Staff"].includes(currentRole)) {
-    return <Navigate to="/app" replace />;
-  }
+  const currentRole = currentUser?.role || localStorage.getItem("role") || "User";
 
   const canAddUsers = currentRole === "Admin" || currentRole === "Staff";
   const canChangeRole = currentRole === "Admin";
@@ -22,351 +17,502 @@ export default function AdminUsers() {
   }, [currentRole]);
 
   const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [msg, setMsg] = useState("");
-  const [err, setErr] = useState("");
-  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
     email: "",
-    role: roleOptionsForCreate[0] || "User",
+    role: "User",
     room_no: "",
     contact: "",
   });
 
-  const [draftRoles, setDraftRoles] = useState({});
+  const [search, setSearch] = useState("");
+
+  const [addMessage, setAddMessage] = useState("");
+  const [addMessageType, setAddMessageType] = useState("");
+
+  const [importMessage, setImportMessage] = useState("");
+  const [importMessageType, setImportMessageType] = useState("");
+
+  const [excelFile, setExcelFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
 
   useEffect(() => {
-    loadUsers();
+    fetchUsers();
   }, []);
 
-  useEffect(() => {
-    if (!roleOptionsForCreate.includes(form.role)) {
-      setForm((prev) => ({
-        ...prev,
-        role: roleOptionsForCreate[0] || "User",
-      }));
-    }
-  }, [roleOptionsForCreate, form.role]);
-
-  async function loadUsers() {
+  async function fetchUsers() {
     try {
       setLoading(true);
-      setErr("");
-
       const res = await api.get("/users");
-      const data = Array.isArray(res.data) ? res.data : [];
-
-      setUsers(data);
-
-      const nextDrafts = {};
-      data.forEach((u) => {
-        nextDrafts[u.id] = u.role || "User";
-      });
-      setDraftRoles(nextDrafts);
-    } catch (e) {
-      console.error("LOAD USERS ERROR:", e);
-      setErr(e?.response?.data?.error || "Failed to load users");
+      setUsers(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("FETCH USERS ERROR:", err);
+      setAddMessage(err?.response?.data?.error || "Failed to load users");
+      setAddMessageType("error");
     } finally {
       setLoading(false);
     }
   }
 
-  async function createUser(e) {
+  function onChange(e) {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  }
+
+  async function handleAddUser(e) {
     e.preventDefault();
+    setAddMessage("");
+    setAddMessageType("");
 
     try {
-      setErr("");
-      setMsg("");
+      setSaving(true);
 
-      if (!form.name || !form.email) {
-        setErr("Name and email are required");
-        return;
-      }
-
-      const res = await api.post("/users", {
+      const payload = {
         name: form.name,
         email: form.email,
-        role: currentRole === "Staff" ? "User" : form.role,
+        role: form.role,
         room_no: form.room_no,
         contact: form.contact,
-      });
+      };
 
-      setMsg(res.data?.message || "User created successfully");
+      const res = await api.post("/users", payload);
+
+      const mailNote =
+        res.data?.email_status === "sent"
+          ? " Temporary password email sent successfully."
+          : res.data?.email_status === "failed"
+          ? " User added, but email sending failed. Check backend mail settings."
+          : "";
+
+      setAddMessage((res.data?.message || "User added successfully") + mailNote);
+      setAddMessageType(res.data?.email_status === "failed" ? "error" : "success");
 
       setForm({
         name: "",
         email: "",
-        role: roleOptionsForCreate[0] || "User",
+        role: "User",
         room_no: "",
         contact: "",
       });
 
-      await loadUsers();
-    } catch (e) {
-      console.error("CREATE USER ERROR:", e);
-      setErr(e?.response?.data?.error || "Failed to create user");
+      fetchUsers();
+    } catch (err) {
+      console.error("ADD USER ERROR:", err);
+      setAddMessage(err?.response?.data?.error || "Failed to add user");
+      setAddMessageType("error");
+    } finally {
+      setSaving(false);
     }
   }
 
-  async function changeRole(userId) {
+  async function handleRoleUpdate(userId) {
+    const roleValue = document.getElementById(`role-${userId}`)?.value;
+
     try {
-      setErr("");
-      setMsg("");
+      const res = await api.put(`/users/${userId}/role`, { role: roleValue });
+      setAddMessage(res.data?.message || "Role updated successfully");
+      setAddMessageType("success");
+      fetchUsers();
+    } catch (err) {
+      console.error("ROLE UPDATE ERROR:", err);
+      setAddMessage(err?.response?.data?.error || "Failed to update role");
+      setAddMessageType("error");
+    }
+  }
 
-      const newRole = draftRoles[userId];
-      const targetUser = users.find((u) => u.id === userId);
+  async function handleDelete(userId) {
+    const ok = window.confirm("Are you sure you want to delete this user?");
+    if (!ok) return;
 
-      if (!targetUser) {
-        setErr("User not found");
-        return;
-      }
+    try {
+      const res = await api.delete(`/users/${userId}`);
+      setAddMessage(res.data?.message || "User deleted successfully");
+      setAddMessageType("success");
+      fetchUsers();
+    } catch (err) {
+      console.error("DELETE USER ERROR:", err);
+      setAddMessage(err?.response?.data?.error || "Failed to delete user");
+      setAddMessageType("error");
+    }
+  }
 
-      if (targetUser.role === newRole) {
-        setMsg("No role change needed");
-        return;
-      }
+  async function handleImportExcel() {
+    setImportMessage("");
+    setImportMessageType("");
+    setImportResult(null);
 
-      const res = await api.put(`/users/${userId}/role`, { role: newRole });
-      const updatedUser = res.data?.user;
+    if (!excelFile) {
+      setImportMessage("Please choose an Excel file first");
+      setImportMessageType("error");
+      return;
+    }
 
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === userId ? { ...u, role: updatedUser?.role || newRole } : u
-        )
+    try {
+      setImporting(true);
+
+      const formData = new FormData();
+      formData.append("file", excelFile);
+
+      const res = await api.post("/users/import", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      setImportResult(res.data);
+      setImportMessage(res.data?.message || "Excel imported successfully");
+      setImportMessageType(
+        res.data?.summary?.email_failed_count > 0 ? "error" : "success"
       );
 
-      setDraftRoles((prev) => ({
-        ...prev,
-        [userId]: updatedUser?.role || newRole,
-      }));
+      setExcelFile(null);
+      const fileInput = document.getElementById("student-excel-input");
+      if (fileInput) fileInput.value = "";
 
-      setMsg(res.data?.message || "Role updated successfully");
-    } catch (e) {
-      console.error("CHANGE ROLE ERROR:", e);
-      setErr(e?.response?.data?.error || "Failed to update role");
+      fetchUsers();
+    } catch (err) {
+      console.error("IMPORT EXCEL ERROR:", err);
+      const backendError =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        "Failed to import users from Excel";
+
+      setImportMessage(backendError);
+      setImportMessageType("error");
+    } finally {
+      setImporting(false);
     }
   }
 
-  async function deleteUser(userId) {
-    try {
-      setErr("");
-      setMsg("");
-
-      await api.delete(`/users/${userId}`);
-
-      setUsers((prev) => prev.filter((u) => u.id !== userId));
-      setMsg("User deleted successfully");
-    } catch (e) {
-      console.error("DELETE USER ERROR:", e);
-      setErr(e?.response?.data?.error || "Failed to delete user");
-    }
-  }
-
-  const filteredUsers = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return users;
-
-    return users.filter((u) => {
-      const text = [
-        u.name,
-        u.email,
-        u.role,
-        u.room_no,
-        u.contact,
-        u.must_change_password ? "pending change" : "changed",
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return text.includes(q);
-    });
-  }, [users, search]);
+  const filteredUsers = users.filter((u) => {
+    const term = search.toLowerCase();
+    return (
+      (u.name || "").toLowerCase().includes(term) ||
+      (u.email || "").toLowerCase().includes(term) ||
+      (u.role || "").toLowerCase().includes(term) ||
+      String(u.room_no || "").toLowerCase().includes(term) ||
+      String(u.contact || "").toLowerCase().includes(term)
+    );
+  });
 
   const normalUsers = filteredUsers.filter((u) => u.role === "User");
   const staffUsers = filteredUsers.filter((u) => u.role === "Staff");
   const adminUsers = filteredUsers.filter((u) => u.role === "Admin");
 
-  function renderTableRows(list) {
-    return list.map((u) => (
-      <tr key={u.id}>
-        <td>{u.name}</td>
-        <td>{u.email}</td>
-        <td>{u.role}</td>
-        <td>{u.room_no || "-"}</td>
-        <td>{u.contact || "-"}</td>
-        <td>{u.must_change_password ? "Pending Change" : "Changed"}</td>
-
-        {canChangeRole && (
-          <td>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <select
-                className="input"
-                style={{ margin: 0 }}
-                value={draftRoles[u.id] || u.role}
-                onChange={(e) =>
-                  setDraftRoles((prev) => ({
-                    ...prev,
-                    [u.id]: e.target.value,
-                  }))
-                }
-              >
-                <option value="User">User</option>
-                <option value="Staff">Staff</option>
-                <option value="Admin">Admin</option>
-              </select>
-
-              <button
-                className="btn btnBlue"
-                type="button"
-                onClick={() => changeRole(u.id)}
-              >
-                Update
-              </button>
-            </div>
-          </td>
-        )}
-
-        {canDeleteUsers && (
-          <td>
-            <button
-              className="btn"
-              type="button"
-              onClick={() => deleteUser(u.id)}
-              disabled={u.role === "Admin"}
-            >
-              Delete
-            </button>
-          </td>
-        )}
-      </tr>
-    ));
-  }
-
-  function renderTable(title, list) {
+  function UserTable({ title, list }) {
     return (
-      <div className="card" style={{ marginTop: 18 }}>
+      <div className="admin-users-card card" style={{ marginBottom: 20 }}>
         <h3>{title}</h3>
 
-        {list.length === 0 ? (
-          <p>No records found.</p>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table className="table">
-              <thead>
+        <div style={{ overflowX: "auto" }}>
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Room</th>
+                <th>Contact</th>
+                <th>Temp Password</th>
+                <th>Change Role</th>
+                <th>Delete</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.length === 0 ? (
                 <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Room</th>
-                  <th>Contact</th>
-                  <th>Temp Password</th>
-                  {canChangeRole && <th>Change Role</th>}
-                  {canDeleteUsers && <th>Delete</th>}
+                  <td colSpan="8">No users found.</td>
                 </tr>
-              </thead>
-              <tbody>{renderTableRows(list)}</tbody>
-            </table>
-          </div>
-        )}
+              ) : (
+                list.map((u) => (
+                  <tr key={u.id}>
+                    <td>{u.name}</td>
+                    <td>{u.email}</td>
+                    <td>
+                      <span className={`role-chip role-${(u.role || "").toLowerCase()}`}>
+                        {u.role}
+                      </span>
+                    </td>
+                    <td>{u.room_no || "-"}</td>
+                    <td>{u.contact || "-"}</td>
+                    <td>{u.must_change_password ? "Pending Change" : "Changed"}</td>
+                    <td>
+                      {canChangeRole ? (
+                        <div className="role-actions">
+                          <select
+                            id={`role-${u.id}`}
+                            defaultValue={u.role}
+                            className="input"
+                          >
+                            <option value="User">User</option>
+                            <option value="Staff">Staff</option>
+                            <option value="Admin">Admin</option>
+                          </select>
+                          <button
+                            className="btn btn-update"
+                            onClick={() => handleRoleUpdate(u.id)}
+                          >
+                            Update
+                          </button>
+                        </div>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td>
+                      {canDeleteUsers ? (
+                        <button
+                          className="btn btn-delete"
+                          onClick={() => handleDelete(u.id)}
+                        >
+                          Delete
+                        </button>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="grid">
-      {canAddUsers && (
-        <div className="card">
-          <h2>Manage Users</h2>
+    <div className="grid admin-users-page" style={{ alignItems: "start" }}>
+      <div className="admin-users-card card">
+        <h2>Manage Users</h2>
 
-          {msg ? <p style={{ color: "green", marginBottom: 12 }}>{msg}</p> : null}
-          {err ? <p style={{ color: "red", marginBottom: 12 }}>{err}</p> : null}
+        {addMessage ? (
+          <div className={`status-box ${addMessageType === "success" ? "status-success" : "status-error"}`}>
+            {addMessage}
+          </div>
+        ) : null}
 
-          <form onSubmit={createUser}>
-            <input
-              className="input"
-              placeholder="Name"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
+        {canAddUsers && (
+          <>
+            <form onSubmit={handleAddUser} className="user-form">
+              <input
+                className="input"
+                name="name"
+                placeholder="Name"
+                value={form.name}
+                onChange={onChange}
+              />
 
-            <input
-              className="input"
-              type="email"
-              placeholder="Email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-            />
+              <input
+                className="input"
+                name="email"
+                placeholder="Email"
+                value={form.email}
+                onChange={onChange}
+              />
 
-            <select
-              className="input"
-              value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value })}
-              disabled={currentRole === "Staff"}
-            >
-              {roleOptionsForCreate.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
-              ))}
-            </select>
+              <select
+                className="input"
+                name="role"
+                value={form.role}
+                onChange={onChange}
+              >
+                {roleOptionsForCreate.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </select>
 
-            <input
-              className="input"
-              placeholder="Room No"
-              value={form.room_no}
-              onChange={(e) => setForm({ ...form, room_no: e.target.value })}
-            />
+              <input
+                className="input"
+                name="room_no"
+                placeholder="Room No"
+                value={form.room_no}
+                onChange={onChange}
+              />
 
-            <input
-              className="input"
-              placeholder="Contact"
-              value={form.contact}
-              onChange={(e) => setForm({ ...form, contact: e.target.value })}
-            />
+              <input
+                className="input"
+                name="contact"
+                placeholder="Contact"
+                value={form.contact}
+                onChange={onChange}
+              />
 
-            <button className="btn btnBlue" type="submit">
-              Add User
-            </button>
-          </form>
+              <button className="btn btn-add" type="submit" disabled={saving}>
+                {saving ? "Adding..." : "Add User"}
+              </button>
+            </form>
 
-          <p className="muted" style={{ marginTop: 12 }}>
-            Temporary password will be generated automatically and sent to the user's email.
-          </p>
-        </div>
-      )}
+            <p className="muted" style={{ marginTop: 12 }}>
+              Temporary password will be generated automatically and sent to the user's email.
+            </p>
 
-      <div>
-        <div className="card">
-          <div className="searchBarWrap">
-            <div>
-              <h3 style={{ marginBottom: 6 }}>Search Users</h3>
-              <p className="muted" style={{ marginBottom: 0 }}>
-                Search by name, email, role, room, or contact
-              </p>
+            <hr style={{ margin: "22px 0", border: "none", borderTop: "1px solid rgba(0,0,0,0.08)" }} />
+
+            <h3>Import Students from Excel</h3>
+
+            {importMessage ? (
+              <div className={`status-box ${importMessageType === "success" ? "status-success" : "status-error"}`}>
+                {importMessage}
+              </div>
+            ) : null}
+
+            <p className="muted">
+              Excel must contain columns like: Name, Email, Mobile/Contact, Room No
+            </p>
+
+            <div className="excel-upload-box">
+              <input
+                id="student-excel-input"
+                type="file"
+                accept=".xlsx"
+                className="input"
+                onChange={(e) => setExcelFile(e.target.files?.[0] || null)}
+              />
+
+              <button
+                type="button"
+                className="btn btn-import"
+                onClick={handleImportExcel}
+                disabled={importing}
+              >
+                {importing ? "Importing..." : "Import Excel"}
+              </button>
             </div>
 
-            <input
-              className="input searchInput"
-              placeholder="Search user..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+            {importResult && (
+              <div style={{ marginTop: 18 }}>
+                <div className="import-summary-card">
+                  <h4>Import Summary</h4>
+                  <div className="import-summary-grid">
+                    <div><strong>Total Rows:</strong> {importResult.summary?.total_rows || 0}</div>
+                    <div><strong>Added:</strong> {importResult.summary?.added_count || 0}</div>
+                    <div><strong>Skipped:</strong> {importResult.summary?.skipped_count || 0}</div>
+                    <div><strong>Failed Rows:</strong> {importResult.summary?.failed_count || 0}</div>
+                    <div><strong>Email Sent:</strong> {importResult.summary?.email_sent_count || 0}</div>
+                    <div><strong>Email Failed:</strong> {importResult.summary?.email_failed_count || 0}</div>
+                  </div>
+                </div>
+
+                {importResult.added_users?.length > 0 && (
+                  <div className="admin-users-card card" style={{ marginTop: 14 }}>
+                    <h4>Added Users</h4>
+                    <div style={{ overflowX: "auto" }}>
+                      <table className="admin-table">
+                        <thead>
+                          <tr>
+                            <th>Row</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Room</th>
+                            <th>Contact</th>
+                            <th>Temp Password</th>
+                            <th>Email Status</th>
+                            <th>Email Error</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {importResult.added_users.map((u) => (
+                            <tr key={`${u.email}-${u.row_number}`}>
+                              <td>{u.row_number}</td>
+                              <td>{u.name}</td>
+                              <td>{u.email}</td>
+                              <td>{u.room_no || "-"}</td>
+                              <td>{u.contact || "-"}</td>
+                              <td>{u.temp_password}</td>
+                              <td>{u.email_status}</td>
+                              <td>{u.email_error || "-"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {importResult.skipped_users?.length > 0 && (
+                  <div className="admin-users-card card" style={{ marginTop: 14 }}>
+                    <h4>Skipped Users</h4>
+                    <div style={{ overflowX: "auto" }}>
+                      <table className="admin-table">
+                        <thead>
+                          <tr>
+                            <th>Row</th>
+                            <th>Email</th>
+                            <th>Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {importResult.skipped_users.map((u, i) => (
+                            <tr key={`${u.email || "skip"}-${i}`}>
+                              <td>{u.row_number}</td>
+                              <td>{u.email || "-"}</td>
+                              <td>{u.reason}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {importResult.failed_users?.length > 0 && (
+                  <div className="admin-users-card card" style={{ marginTop: 14 }}>
+                    <h4>Failed Rows</h4>
+                    <div style={{ overflowX: "auto" }}>
+                      <table className="admin-table">
+                        <thead>
+                          <tr>
+                            <th>Row</th>
+                            <th>Email</th>
+                            <th>Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {importResult.failed_users.map((u, i) => (
+                            <tr key={`${u.email || "fail"}-${i}`}>
+                              <td>{u.row_number}</td>
+                              <td>{u.email || "-"}</td>
+                              <td>{u.reason}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <div>
+        <div className="admin-users-card card" style={{ marginBottom: 20 }}>
+          <h3>Search Users</h3>
+          <p className="muted">Search by name, email, role, room, or contact</p>
+          <input
+            className="input"
+            placeholder="Search user..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
 
         {loading ? (
-          <div className="card" style={{ marginTop: 18 }}>
-            <h3>Users List</h3>
+          <div className="admin-users-card card">
             <p>Loading users...</p>
           </div>
         ) : (
           <>
-            {renderTable("Users List", normalUsers)}
-            {renderTable("Staff List", staffUsers)}
-            {renderTable("Admin List", adminUsers)}
+            <UserTable title="Users List" list={normalUsers} />
+            <UserTable title="Staff List" list={staffUsers} />
+            <UserTable title="Admin List" list={adminUsers} />
           </>
         )}
       </div>

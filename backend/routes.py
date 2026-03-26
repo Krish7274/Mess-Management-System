@@ -1,13 +1,15 @@
 import os
 import random
 import string
+import re
 from datetime import datetime, timedelta
+
 from werkzeug.utils import secure_filename
-from flask import send_from_directory
-from flask import Blueprint, request, jsonify
+from flask import send_from_directory, Blueprint, request, jsonify
 from flask_jwt_extended import (
     create_access_token, jwt_required, get_jwt, get_jwt_identity
 )
+from openpyxl import load_workbook
 
 from models import (
     db,
@@ -62,6 +64,93 @@ def parse_flexible_date(date_str):
 def normalize_to_iso_date(date_str):
     dt = parse_flexible_date(date_str)
     return dt.strftime("%Y-%m-%d")
+
+
+def normalize_email(email):
+    return str(email or "").strip().lower()
+
+
+def normalize_text(value):
+    return str(value or "").strip()
+
+
+def is_valid_excel_file(filename):
+    return bool(filename and filename.lower().endswith(".xlsx"))
+
+
+def clean_contact(value):
+    raw = str(value or "").strip()
+    return re.sub(r"[^\d+]", "", raw)
+
+
+def read_students_from_excel(file_storage):
+    try:
+        file_storage.stream.seek(0)
+        workbook = load_workbook(file_storage.stream, data_only=True)
+        sheet = workbook.active
+    except Exception as e:
+        print("EXCEL READ ERROR:", e)
+        return [], "Unable to read Excel file. Please upload a valid .xlsx file."
+
+    rows = list(sheet.iter_rows(values_only=True))
+    if not rows:
+        return [], "Excel file is empty"
+
+    headers = [normalize_text(h).lower() for h in rows[0]]
+
+    aliases = {
+        "name": ["name", "student name", "full name"],
+        "email": ["email", "mail", "mail-id", "mail id", "email id", "email-id"],
+        "contact": ["contact", "mobile", "mob", "mobile number", "mob number", "phone", "phone number"],
+        "room_no": ["room no", "room_no", "room", "room number"],
+    }
+
+    header_map = {
+        "name": None,
+        "email": None,
+        "contact": None,
+        "room_no": None,
+    }
+
+    for field, possible_names in aliases.items():
+        for index, header in enumerate(headers):
+            if header in possible_names:
+                header_map[field] = index
+                break
+
+    if header_map["name"] is None or header_map["email"] is None:
+        return [], "Excel must contain Name and Email columns"
+
+    students = []
+
+    for row_number, row in enumerate(rows[1:], start=2):
+        if not row:
+            continue
+
+        def get_cell(col_index):
+            if col_index is None:
+                return ""
+            if col_index >= len(row):
+                return ""
+            return row[col_index]
+
+        name = normalize_text(get_cell(header_map["name"]))
+        email = normalize_email(get_cell(header_map["email"]))
+        contact = clean_contact(get_cell(header_map["contact"]))
+        room_no = normalize_text(get_cell(header_map["room_no"]))
+
+        if not name and not email and not contact and not room_no:
+            continue
+
+        students.append({
+            "row_number": row_number,
+            "name": name,
+            "email": email,
+            "contact": contact,
+            "room_no": room_no,
+        })
+
+    return students, None
 
 
 @api.post("/auth/send-otp")
@@ -357,13 +446,20 @@ def add_user():
         db.session.add(new_user)
         db.session.commit()
 
+        email_status = "sent"
+        email_error = None
         try:
             send_user_welcome_email(new_user.email, new_user.name, temp_password)
         except Exception as mail_error:
+            email_status = "failed"
+            email_error = str(mail_error)
             print("WELCOME MAIL ERROR:", mail_error)
 
         return jsonify({
-            "message": "User added successfully. Temporary password sent to email.",
+            "message": "User added successfully",
+            "email_status": email_status,
+            "email_error": email_error,
+            "temp_password": temp_password,
             "user": {
                 "id": new_user.id,
                 "name": new_user.name,
@@ -379,6 +475,144 @@ def add_user():
         db.session.rollback()
         print("ADD USER ERROR:", e)
         return jsonify({"error": "Failed to add user"}), 500
+
+
+@api.post("/users/import")
+@jwt_required()
+def import_users_from_excel():
+    if not require_roles("Admin", "Staff")():
+        return jsonify({"error": "Forbidden"}), 403
+
+    try:
+        if "file" not in request.files:
+            return jsonify({"error": "Excel file is required"}), 400
+
+        file = request.files["file"]
+
+        if not file or not file.filename:
+            return jsonify({"error": "Please choose an Excel file"}), 400
+
+        if not is_valid_excel_file(file.filename):
+            return jsonify({"error": "Only .xlsx Excel files are allowed"}), 400
+
+        students, read_error = read_students_from_excel(file)
+        if read_error:
+            return jsonify({"error": read_error}), 400
+
+        if not students:
+            return jsonify({"error": "No valid student rows found in Excel"}), 400
+
+        added_users = []
+        skipped_users = []
+        failed_users = []
+
+        for student in students:
+            row_number = student["row_number"]
+            name = student["name"]
+            email = student["email"]
+            contact = student["contact"]
+            room_no = student["room_no"]
+
+            try:
+                if not name:
+                    skipped_users.append({
+                        "row_number": row_number,
+                        "email": email or "-",
+                        "reason": "Name is required"
+                    })
+                    continue
+
+                if not email:
+                    skipped_users.append({
+                        "row_number": row_number,
+                        "email": "-",
+                        "reason": "Email is required"
+                    })
+                    continue
+
+                existing = User.query.filter_by(email=email).first()
+                if existing:
+                    skipped_users.append({
+                        "row_number": row_number,
+                        "email": email,
+                        "reason": "Email already exists"
+                    })
+                    continue
+
+                temp_password = generate_temp_password()
+
+                new_user = User(
+                    name=name,
+                    email=email,
+                    role="User",
+                    contact=contact,
+                    room_no=room_no,
+                    must_change_password=True
+                )
+                new_user.set_password(temp_password)
+
+                db.session.add(new_user)
+                db.session.commit()
+
+                email_status = "sent"
+                email_error = None
+                try:
+                    send_user_welcome_email(new_user.email, new_user.name, temp_password)
+                except Exception as mail_error:
+                    email_status = "failed"
+                    email_error = str(mail_error)
+                    print(f"IMPORT MAIL ERROR for {email}:", mail_error)
+
+                added_users.append({
+                    "id": new_user.id,
+                    "row_number": row_number,
+                    "name": new_user.name,
+                    "email": new_user.email,
+                    "role": new_user.role,
+                    "contact": new_user.contact,
+                    "room_no": new_user.room_no,
+                    "temp_password": temp_password,
+                    "email_status": email_status,
+                    "email_error": email_error
+                })
+
+            except Exception as row_error:
+                db.session.rollback()
+                print(f"IMPORT ROW ERROR row {row_number}:", row_error)
+                failed_users.append({
+                    "row_number": row_number,
+                    "email": email or "-",
+                    "reason": str(row_error)
+                })
+
+        sent_count = len([u for u in added_users if u["email_status"] == "sent"])
+        failed_mail_count = len([u for u in added_users if u["email_status"] == "failed"])
+
+        message = (
+            f"Excel import completed. Added {len(added_users)} users, "
+            f"skipped {len(skipped_users)}, failed rows {len(failed_users)}, "
+            f"email sent {sent_count}, email failed {failed_mail_count}."
+        )
+
+        return jsonify({
+            "message": message,
+            "summary": {
+                "total_rows": len(students),
+                "added_count": len(added_users),
+                "skipped_count": len(skipped_users),
+                "failed_count": len(failed_users),
+                "email_sent_count": sent_count,
+                "email_failed_count": failed_mail_count
+            },
+            "added_users": added_users,
+            "skipped_users": skipped_users,
+            "failed_users": failed_users
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print("IMPORT USERS ERROR:", e)
+        return jsonify({"error": f"Failed to import users from Excel: {str(e)}"}), 500
 
 
 @api.get("/users")
@@ -621,6 +855,27 @@ def get_day_name_from_date(date_str):
     return dt.strftime("%A")
 
 
+def get_today_menu_from_weekly_menu(date_str):
+    week_start = get_week_start_from_date(date_str)
+    day_name = get_day_name_from_date(date_str)
+
+    weekly_menu = WeeklyMenu.query.filter_by(week_start=week_start).first()
+    if not weekly_menu:
+        return None, f"No weekly menu found for week starting {week_start}"
+
+    weekly_items = weekly_menu.weekly_items or {}
+    day_block = weekly_items.get(day_name, {}) or {}
+
+    return {
+        "week_start": week_start,
+        "date": normalize_to_iso_date(date_str),
+        "day": day_name,
+        "breakfast": day_block.get("Breakfast", {"items": "", "price": 0}),
+        "lunch": day_block.get("Lunch", {"items": "", "price": 0}),
+        "dinner": day_block.get("Dinner", {"items": "", "price": 0}),
+    }, None
+
+
 def get_meal_price_from_weekly_menu(date_str, meal_type):
     week_start = get_week_start_from_date(date_str)
     day_name = get_day_name_from_date(date_str)
@@ -644,27 +899,109 @@ def get_meal_price_from_weekly_menu(date_str, meal_type):
     return round(price, 2), None
 
 
+def bill_belongs_to_month(bill_row, month_value):
+    return str(bill_row.month or "").startswith(month_value)
+
+
+def recalculate_parent_monthly_bill(parent_bill_id):
+    parent_bill = Bill.query.get(parent_bill_id)
+    if not parent_bill:
+        return None
+
+    child_bills = Bill.query.filter_by(parent_bill_id=parent_bill.id).all()
+    active_children = [b for b in child_bills if b.status in ["Merged", "Paid"]]
+
+    if not active_children and parent_bill.status != "Paid":
+        db.session.delete(parent_bill)
+        return None
+
+    parent_bill.amount = round(sum(float(b.amount or 0) for b in active_children), 2)
+    return parent_bill
+
+
+def get_unmerged_daily_bills_for_month(user_id, month_value):
+    daily_bills = Bill.query.filter_by(user_id=user_id, bill_type="daily").all()
+    return [
+        b for b in daily_bills
+        if bill_belongs_to_month(b, month_value)
+        and b.parent_bill_id is None
+        and b.status == "Unpaid"
+    ]
+
+
+def serialize_bill_row(bill_row, include_user=False):
+    payment = Payment.query.filter_by(bill_id=bill_row.id).order_by(Payment.id.desc()).first()
+    child_count = Bill.query.filter_by(parent_bill_id=bill_row.id).count()
+    user = User.query.get(bill_row.user_id) if include_user else None
+
+    data = {
+        "id": bill_row.id,
+        "user_id": bill_row.user_id,
+        "bill_type": bill_row.bill_type,
+        "meal_type": bill_row.meal_type,
+        "attendance_id": bill_row.attendance_id,
+        "parent_bill_id": bill_row.parent_bill_id,
+        "period": bill_row.month,
+        "amount": round(float(bill_row.amount or 0), 2),
+        "status": bill_row.status,
+        "included_meals_count": child_count,
+        "can_pay": bill_row.status == "Unpaid" and bill_row.parent_bill_id is None,
+        "payment": {
+            "mode": payment.mode,
+            "receipt_no": payment.receipt_no,
+            "proof_url": f"http://127.0.0.1:5000/api/uploads/{payment.proof_filename}" if payment and payment.proof_filename else None,
+            "paid_at": payment.paid_at.isoformat() if payment and payment.paid_at else None
+        } if payment else None
+    }
+
+    if include_user:
+        data["user_name"] = user.name if user else "Unknown"
+        data["user_email"] = user.email if user else "Unknown"
+
+    return data
+
+
 def sync_attendance_bill(attendance_row):
+    existing_bill = Bill.query.filter_by(attendance_id=attendance_row.id).first()
+
     if attendance_row.status == "Taken":
         meal_price, error = get_meal_price_from_weekly_menu(
             attendance_row.date,
             attendance_row.meal_type
         )
         if error:
-            return False, error
-
-        existing_bill = Bill.query.filter_by(
-            attendance_id=attendance_row.id
-        ).first()
+            return False, error, None
 
         if existing_bill:
+            if existing_bill.parent_bill_id:
+                parent_bill = Bill.query.get(existing_bill.parent_bill_id)
+                if parent_bill and parent_bill.status == "Paid":
+                    return False, "This attendance is already settled inside a paid monthly bill", None
+
+                existing_bill.user_id = attendance_row.user_id
+                existing_bill.month = attendance_row.date
+                existing_bill.bill_type = "daily"
+                existing_bill.meal_type = attendance_row.meal_type
+                existing_bill.attendance_id = attendance_row.id
+                existing_bill.amount = meal_price
+                existing_bill.status = "Merged"
+
+                if parent_bill:
+                    recalculate_parent_monthly_bill(parent_bill.id)
+
+                return True, "Attendance bill updated and monthly total refreshed", existing_bill
+
+            if existing_bill.status == "Paid":
+                return False, "This attendance bill is already paid and cannot be changed", None
+
             existing_bill.user_id = attendance_row.user_id
             existing_bill.month = attendance_row.date
             existing_bill.bill_type = "daily"
             existing_bill.meal_type = attendance_row.meal_type
             existing_bill.attendance_id = attendance_row.id
             existing_bill.amount = meal_price
-            return True, "Attendance bill updated"
+            existing_bill.status = "Unpaid"
+            return True, "Attendance bill updated", existing_bill
 
         new_bill = Bill(
             user_id=attendance_row.user_id,
@@ -672,10 +1009,12 @@ def sync_attendance_bill(attendance_row):
             bill_type="daily",
             meal_type=attendance_row.meal_type,
             attendance_id=attendance_row.id,
+            parent_bill_id=None,
             amount=meal_price,
             status="Unpaid"
         )
         db.session.add(new_bill)
+        db.session.flush()
 
         user = User.query.get(attendance_row.user_id)
         if user:
@@ -698,16 +1037,25 @@ def sync_attendance_bill(attendance_row):
                 except Exception as mail_error:
                     print("AUTO ATTENDANCE BILL EMAIL ERROR:", mail_error)
 
-        return True, "Attendance bill created"
+        return True, "Attendance bill created", new_bill
 
-    existing_bill = Bill.query.filter_by(attendance_id=attendance_row.id).first()
     if existing_bill:
+        if existing_bill.parent_bill_id:
+            parent_bill = Bill.query.get(existing_bill.parent_bill_id)
+            if parent_bill and parent_bill.status == "Paid":
+                return False, "This attendance is already settled inside a paid monthly bill", None
+            db.session.delete(existing_bill)
+            if parent_bill:
+                recalculate_parent_monthly_bill(parent_bill.id)
+            return True, "Attendance removed and monthly total refreshed", None
+
         if existing_bill.status == "Paid":
-            return False, "Bill already paid, cannot auto-delete it after skipping attendance"
+            return False, "Bill already paid, cannot auto-delete it after skipping attendance", None
+
         Payment.query.filter_by(bill_id=existing_bill.id).delete()
         db.session.delete(existing_bill)
 
-    return True, "Attendance bill removed"
+    return True, "Attendance bill removed", None
 
 
 @api.get("/menu/weekly")
@@ -715,6 +1063,29 @@ def sync_attendance_bill(attendance_row):
 def get_weekly_menus():
     menus = WeeklyMenu.query.order_by(WeeklyMenu.week_start.desc()).all()
     return jsonify([serialize_weekly_menu(m) for m in menus])
+
+
+@api.get("/menu/weekly/today")
+@jwt_required()
+def get_today_weekly_menu():
+    try:
+        requested_date = request.args.get("date")
+
+        if requested_date:
+            date_str = normalize_to_iso_date(requested_date)
+        else:
+            date_str = datetime.utcnow().strftime("%Y-%m-%d")
+
+        data, error = get_today_menu_from_weekly_menu(date_str)
+
+        if error:
+            return jsonify({"error": error}), 404
+
+        return jsonify(data), 200
+
+    except Exception as e:
+        print("GET TODAY WEEKLY MENU ERROR:", e)
+        return jsonify({"error": "Failed to load today's weekly menu"}), 500
 
 
 @api.post("/menu/weekly")
@@ -891,7 +1262,7 @@ def mark_attendance():
 
         if existing:
             existing.status = status
-            ok, billing_message = sync_attendance_bill(existing)
+            ok, billing_message, bill_row = sync_attendance_bill(existing)
             if not ok:
                 db.session.rollback()
                 return jsonify({"error": billing_message}), 400
@@ -899,7 +1270,8 @@ def mark_attendance():
             db.session.commit()
             return jsonify({
                 "message": "Attendance updated successfully",
-                "billing_message": billing_message
+                "billing_message": billing_message,
+                "bill": serialize_bill_row(bill_row) if bill_row else None
             }), 200
 
         new_attendance = Attendance(
@@ -911,7 +1283,7 @@ def mark_attendance():
         db.session.add(new_attendance)
         db.session.flush()
 
-        ok, billing_message = sync_attendance_bill(new_attendance)
+        ok, billing_message, bill_row = sync_attendance_bill(new_attendance)
         if not ok:
             db.session.rollback()
             return jsonify({"error": billing_message}), 400
@@ -920,7 +1292,8 @@ def mark_attendance():
 
         return jsonify({
             "message": "Attendance saved successfully",
-            "billing_message": billing_message
+            "billing_message": billing_message,
+            "bill": serialize_bill_row(bill_row) if bill_row else None
         }), 201
 
     except Exception as e:
@@ -1338,7 +1711,8 @@ def create_bill():
         existing = Bill.query.filter_by(
             user_id=user_id,
             month=period,
-            bill_type=bill_type
+            bill_type=bill_type,
+            parent_bill_id=None
         ).first()
 
         if existing:
@@ -1350,6 +1724,7 @@ def create_bill():
             bill_type=bill_type,
             meal_type=None,
             attendance_id=None,
+            parent_bill_id=None,
             amount=amount,
             status="Unpaid"
         )
@@ -1380,18 +1755,7 @@ def create_bill():
 
         return jsonify({
             "message": "Bill created successfully",
-            "bill": {
-                "id": bill.id,
-                "user_id": bill.user_id,
-                "user_name": user.name,
-                "user_email": user.email,
-                "bill_type": bill.bill_type,
-                "meal_type": bill.meal_type,
-                "attendance_id": bill.attendance_id,
-                "period": bill.month,
-                "amount": bill.amount,
-                "status": bill.status
-            }
+            "bill": serialize_bill_row(bill, include_user=True)
         }), 201
 
     except Exception as e:
@@ -1400,35 +1764,97 @@ def create_bill():
         return jsonify({"error": "Bill creation failed"}), 500
 
 
+@api.post("/billing/generate-monthly")
+@jwt_required()
+def generate_monthly_bill_from_attendance():
+    try:
+        data = request.get_json() or {}
+        period = (data.get("period") or datetime.utcnow().strftime("%Y-%m")).strip()
+        role = get_jwt().get("role")
+        logged_in_user_id = int(get_jwt_identity())
+
+        try:
+            datetime.strptime(period, "%Y-%m")
+        except Exception:
+            return jsonify({"error": "period must be in YYYY-MM format"}), 400
+
+        target_user_id = logged_in_user_id
+        if role == "Admin" and data.get("user_id") is not None:
+            try:
+                target_user_id = int(data.get("user_id"))
+            except Exception:
+                return jsonify({"error": "user_id must be a valid number"}), 400
+
+        user = User.query.get(target_user_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        existing_monthly = Bill.query.filter_by(
+            user_id=target_user_id,
+            month=period,
+            bill_type="monthly",
+            meal_type="Monthly Attendance",
+            parent_bill_id=None
+        ).first()
+        if existing_monthly:
+            return jsonify({"error": "Monthly attendance bill already exists for this month"}), 400
+
+        source_bills = get_unmerged_daily_bills_for_month(target_user_id, period)
+        if not source_bills:
+            return jsonify({"error": "No unpaid daily attendance bills found for this month"}), 400
+
+        total_amount = round(sum(float(b.amount or 0) for b in source_bills), 2)
+        monthly_bill = Bill(
+            user_id=target_user_id,
+            month=period,
+            bill_type="monthly",
+            meal_type="Monthly Attendance",
+            attendance_id=None,
+            parent_bill_id=None,
+            amount=total_amount,
+            status="Unpaid"
+        )
+        db.session.add(monthly_bill)
+        db.session.flush()
+
+        for bill_row in source_bills:
+            bill_row.parent_bill_id = monthly_bill.id
+            bill_row.status = "Merged"
+
+        db.session.add(Notification(
+            user_id=user.id,
+            title="Monthly Attendance Bill Generated",
+            message=f"Your monthly attendance bill for {period} has been generated: ₹{total_amount}"
+        ))
+
+        db.session.commit()
+
+        if user.email:
+            try:
+                send_bill_email(user.email, user.name, "Monthly Attendance", period, total_amount)
+            except Exception as mail_error:
+                print("MONTHLY ATTENDANCE EMAIL ERROR:", mail_error)
+
+        return jsonify({
+            "message": "Monthly attendance bill generated successfully",
+            "bill": serialize_bill_row(monthly_bill, include_user=True),
+            "source_bill_ids": [b.id for b in source_bills]
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        print("GENERATE MONTHLY BILL ERROR:", e)
+        return jsonify({"error": "Failed to generate monthly attendance bill"}), 500
+
+
 @api.get("/billing/my")
 @jwt_required()
 def my_bills():
     try:
         user_id = int(get_jwt_identity())
         bills = Bill.query.filter_by(user_id=user_id).order_by(Bill.id.desc()).all()
-
-        result = []
-        for b in bills:
-            payment = Payment.query.filter_by(bill_id=b.id).order_by(Payment.id.desc()).first()
-
-            result.append({
-                "id": b.id,
-                "bill_type": b.bill_type,
-                "meal_type": b.meal_type,
-                "attendance_id": b.attendance_id,
-                "period": b.month,
-                "amount": b.amount,
-                "status": b.status,
-                "payment": {
-                    "mode": payment.mode,
-                    "receipt_no": payment.receipt_no,
-                    "proof_url": f"http://127.0.0.1:5000/api/uploads/{payment.proof_filename}" if payment and payment.proof_filename else None,
-                    "paid_at": payment.paid_at.isoformat() if payment and payment.paid_at else None
-                } if payment else None
-            })
-
-        return jsonify(result), 200
-
+        visible_bills = [b for b in bills if b.parent_bill_id is None]
+        return jsonify([serialize_bill_row(b) for b in visible_bills]), 200
     except Exception as e:
         print("MY BILLS ERROR:", e)
         return jsonify({"error": "Failed to load my bills"}), 500
@@ -1442,33 +1868,8 @@ def all_bills():
 
     try:
         bills = Bill.query.order_by(Bill.id.desc()).all()
-
-        result = []
-        for b in bills:
-            user = User.query.get(b.user_id)
-            payment = Payment.query.filter_by(bill_id=b.id).order_by(Payment.id.desc()).first()
-
-            result.append({
-                "id": b.id,
-                "user_id": b.user_id,
-                "user_name": user.name if user else "Unknown",
-                "user_email": user.email if user else "Unknown",
-                "bill_type": b.bill_type,
-                "meal_type": b.meal_type,
-                "attendance_id": b.attendance_id,
-                "period": b.month,
-                "amount": b.amount,
-                "status": b.status,
-                "payment": {
-                    "mode": payment.mode,
-                    "receipt_no": payment.receipt_no,
-                    "proof_url": f"http://127.0.0.1:5000/api/uploads/{payment.proof_filename}" if payment and payment.proof_filename else None,
-                    "paid_at": payment.paid_at.isoformat() if payment and payment.paid_at else None
-                } if payment else None
-            })
-
-        return jsonify(result), 200
-
+        visible_bills = [b for b in bills if b.parent_bill_id is None]
+        return jsonify([serialize_bill_row(b, include_user=True) for b in visible_bills]), 200
     except Exception as e:
         print("ALL BILLS ERROR:", e)
         return jsonify({"error": "Failed to load all bills"}), 500
@@ -1499,22 +1900,22 @@ def pay_bill():
         if role != "Admin" and bill.user_id != user_id:
             return jsonify({"error": "You can pay only your own bill"}), 403
 
+        if bill.parent_bill_id:
+            return jsonify({"error": "This bill is already included in a monthly bill"}), 400
+
         if bill.status == "Paid":
             return jsonify({"error": "Bill is already paid"}), 400
 
         proof_filename = None
-
         if proof:
             upload_dir = os.path.join(os.getcwd(), "uploads")
             os.makedirs(upload_dir, exist_ok=True)
-
             original_name = secure_filename(proof.filename or "proof")
             timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
             proof_filename = f"{timestamp}_{original_name}"
             proof.save(os.path.join(upload_dir, proof_filename))
 
         receipt_no = f"RCPT-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{bill.id}"
-
         payment = Payment(
             bill_id=bill.id,
             mode=mode,
@@ -1524,8 +1925,13 @@ def pay_bill():
         )
 
         bill.status = "Paid"
-
         db.session.add(payment)
+
+        if bill.bill_type == "monthly":
+            child_bills = Bill.query.filter_by(parent_bill_id=bill.id).all()
+            for child in child_bills:
+                child.status = "Paid"
+
         db.session.commit()
 
         return jsonify({
@@ -1539,7 +1945,8 @@ def pay_bill():
                 "amount": bill.amount,
                 "mode": mode,
                 "paid_at": payment.paid_at.isoformat() if payment.paid_at else datetime.utcnow().isoformat(),
-                "proof_url": f"http://127.0.0.1:5000/api/uploads/{proof_filename}" if proof_filename else None
+                "proof_url": f"http://127.0.0.1:5000/api/uploads/{proof_filename}" if proof_filename else None,
+                "included_meals_count": Bill.query.filter_by(parent_bill_id=bill.id).count()
             }
         }), 200
 
@@ -1555,7 +1962,6 @@ def get_receipt(bill_id):
     try:
         user_id = int(get_jwt_identity())
         role = get_jwt().get("role")
-
         bill = Bill.query.get_or_404(bill_id)
 
         if role != "Admin" and bill.user_id != user_id:
@@ -1574,7 +1980,8 @@ def get_receipt(bill_id):
             "amount": bill.amount,
             "mode": payment.mode,
             "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
-            "proof_url": f"http://127.0.0.1:5000/api/uploads/{payment.proof_filename}" if payment.proof_filename else None
+            "proof_url": f"http://127.0.0.1:5000/api/uploads/{payment.proof_filename}" if payment.proof_filename else None,
+            "included_meals_count": Bill.query.filter_by(parent_bill_id=bill.id).count()
         }), 200
 
     except Exception as e:

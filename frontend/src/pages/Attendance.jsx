@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api";
 import { getUser } from "../auth";
 
@@ -12,6 +13,7 @@ function todayYYYYMMDD() {
 
 export default function Attendance() {
   const user = getUser();
+  const navigate = useNavigate();
   const isAdminOrStaff = user?.role === "Admin" || user?.role === "Staff";
 
   const [date, setDate] = useState(todayYYYYMMDD());
@@ -22,6 +24,7 @@ export default function Attendance() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  const [billingInfo, setBillingInfo] = useState(null);
 
   useEffect(() => {
     if (!isAdminOrStaff) return;
@@ -57,13 +60,14 @@ export default function Attendance() {
   async function markAttendance(status) {
     setMsg("");
     setErr("");
+    setBillingInfo(null);
     setLoading(true);
 
     try {
       const payload = {
         date,
         meal_type: mealType,
-        status
+        status,
       };
 
       if (isAdminOrStaff) {
@@ -71,7 +75,11 @@ export default function Attendance() {
       }
 
       const res = await api.post("/attendance", payload);
-      setMsg(res.data?.message || "Attendance saved");
+      setMsg(
+        [res.data?.message, res.data?.billing_message].filter(Boolean).join(" • ") ||
+          "Attendance saved"
+      );
+      setBillingInfo(res.data?.bill || null);
       await loadRecords();
     } catch (e) {
       setErr(e?.response?.data?.error || "Failed to save attendance");
@@ -80,15 +88,8 @@ export default function Attendance() {
     }
   }
 
-  const takenList = useMemo(
-    () => records.filter((r) => r.status === "Taken"),
-    [records]
-  );
-
-  const skippedList = useMemo(
-    () => records.filter((r) => r.status === "Skipped"),
-    [records]
-  );
+  const takenList = useMemo(() => records.filter((r) => r.status === "Taken"), [records]);
+  const skippedList = useMemo(() => records.filter((r) => r.status === "Skipped"), [records]);
 
   function getUserName(userId) {
     const found = users.find((u) => u.id === userId);
@@ -107,20 +108,30 @@ export default function Attendance() {
           </div>
         )}
 
+        {billingInfo && (
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ marginBottom: 8 }}>Bill Created for This Attendance</h3>
+            <p className="muted" style={{ marginBottom: 8 }}>
+              {billingInfo.period} • {billingInfo.bill_type} • ₹{billingInfo.amount} • {billingInfo.status}
+            </p>
+            <div className="row">
+              <button className="btn btnBlue" onClick={() => navigate("/app/billing")}>
+                Pay This Bill / View Bills
+              </button>
+            </div>
+          </div>
+        )}
+
         <label className="muted">Date</label>
         <input
           className="input"
+          type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          placeholder="YYYY-MM-DD"
         />
 
         <label className="muted">Meal Type</label>
-        <select
-          className="input"
-          value={mealType}
-          onChange={(e) => setMealType(e.target.value)}
-        >
+        <select className="input" value={mealType} onChange={(e) => setMealType(e.target.value)}>
           <option>Breakfast</option>
           <option>Lunch</option>
           <option>Dinner</option>
@@ -140,26 +151,24 @@ export default function Attendance() {
                 </option>
               ))}
             </select>
-            <p className="muted">Admin/Staff can mark attendance for any student.</p>
+            <p className="muted">
+              Admin/Staff can mark attendance for any student. When attendance is marked as Taken,
+              a daily bill is created automatically.
+            </p>
           </>
         ) : (
-          <p className="muted">You can mark only your own attendance.</p>
+          <p className="muted">
+            You can mark only your own attendance. After marking Taken, you can pay that meal bill now
+            or generate one monthly bill later from the Billing page.
+          </p>
         )}
 
         <div className="row" style={{ marginTop: 10 }}>
-          <button
-            className="btn btnBlue"
-            disabled={loading}
-            onClick={() => markAttendance("Taken")}
-          >
+          <button className="btn btnBlue" disabled={loading} onClick={() => markAttendance("Taken")}>
             ✅ Mark Taken
           </button>
 
-          <button
-            className="btn btnRed"
-            disabled={loading}
-            onClick={() => markAttendance("Skipped")}
-          >
+          <button className="btn btnRed" disabled={loading} onClick={() => markAttendance("Skipped")}>
             ❌ Mark Skipped
           </button>
         </div>
