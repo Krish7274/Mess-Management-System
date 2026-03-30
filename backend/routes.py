@@ -23,6 +23,8 @@ from models import (
     Attendance,
     Inventory,
     Complaint,
+    HelpTicket,
+    HelpMessage,
 )
 from utils.email_service import send_bill_email, send_otp_email, send_user_welcome_email
 
@@ -1523,6 +1525,217 @@ def delete_inventory(item_id):
         db.session.rollback()
         print("INVENTORY DELETE ERROR:", e)
         return jsonify({"error": "Failed to delete inventory"}), 500
+
+
+
+
+def serialize_help_message(msg):
+    user = User.query.get(msg.sender_id)
+    return {
+        "id": msg.id,
+        "ticket_id": msg.ticket_id,
+        "sender_id": msg.sender_id,
+        "sender_name": user.name if user else "Unknown",
+        "sender_role": msg.sender_role,
+        "message": msg.message,
+        "created_at": msg.created_at.isoformat() if msg.created_at else None,
+    }
+
+
+def serialize_help_ticket(ticket, include_messages=False):
+    user = User.query.get(ticket.user_id)
+
+    data = {
+        "id": ticket.id,
+        "user_id": ticket.user_id,
+        "user_name": user.name if user else "Unknown",
+        "user_email": user.email if user else "Unknown",
+        "subject": ticket.subject,
+        "category": ticket.category,
+        "status": ticket.status,
+        "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
+        "updated_at": ticket.updated_at.isoformat() if ticket.updated_at else None,
+    }
+
+    if include_messages:
+        messages = HelpMessage.query.filter_by(ticket_id=ticket.id).order_by(HelpMessage.id.asc()).all()
+        data["messages"] = [serialize_help_message(m) for m in messages]
+
+    return data
+
+
+@api.post("/help-centre/tickets")
+@jwt_required()
+def create_help_ticket():
+    try:
+        uid = int(get_jwt_identity())
+        user = User.query.get_or_404(uid)
+
+        data = request.get_json() or {}
+        subject = (data.get("subject") or "").strip()
+        category = (data.get("category") or "").strip()
+        message = (data.get("message") or "").strip()
+
+        if not subject or not message:
+            return jsonify({"error": "subject and message are required"}), 400
+
+        ticket = HelpTicket(
+            user_id=user.id,
+            subject=subject,
+            category=category or "General",
+            status="Open"
+        )
+        db.session.add(ticket)
+        db.session.flush()
+
+        first_message = HelpMessage(
+            ticket_id=ticket.id,
+            sender_id=user.id,
+            sender_role=user.role,
+            message=message
+        )
+        db.session.add(first_message)
+
+        db.session.add(Notification(
+            title="New Help Ticket",
+            message=f"{user.name} created a help ticket: {subject}",
+            role_target="Admin"
+        ))
+        db.session.add(Notification(
+            title="New Help Ticket",
+            message=f"{user.name} created a help ticket: {subject}",
+            role_target="Staff"
+        ))
+
+        db.session.commit()
+
+        return jsonify({
+            "message": "Help ticket created successfully",
+            "ticket": serialize_help_ticket(ticket, include_messages=True)
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        print("CREATE HELP TICKET ERROR:", e)
+        return jsonify({"error": "Failed to create help ticket"}), 500
+
+
+@api.get("/help-centre/tickets")
+@jwt_required()
+def list_help_tickets():
+    try:
+        role = get_jwt().get("role")
+        uid = int(get_jwt_identity())
+
+        if role in ["Admin", "Staff"]:
+            tickets = HelpTicket.query.order_by(HelpTicket.updated_at.desc(), HelpTicket.id.desc()).all()
+        else:
+            tickets = HelpTicket.query.filter_by(user_id=uid).order_by(HelpTicket.updated_at.desc(), HelpTicket.id.desc()).all()
+
+        return jsonify([serialize_help_ticket(t) for t in tickets]), 200
+
+    except Exception as e:
+        print("LIST HELP TICKETS ERROR:", e)
+        return jsonify({"error": "Failed to load help tickets"}), 500
+
+
+@api.get("/help-centre/tickets/<int:ticket_id>")
+@jwt_required()
+def get_help_ticket(ticket_id):
+    try:
+        role = get_jwt().get("role")
+        uid = int(get_jwt_identity())
+
+        ticket = HelpTicket.query.get_or_404(ticket_id)
+
+        if role not in ["Admin", "Staff"] and ticket.user_id != uid:
+            return jsonify({"error": "Forbidden"}), 403
+
+        return jsonify(serialize_help_ticket(ticket, include_messages=True)), 200
+
+    except Exception as e:
+        print("GET HELP TICKET ERROR:", e)
+        return jsonify({"error": "Failed to load help ticket"}), 500
+
+
+@api.post("/help-centre/tickets/<int:ticket_id>/messages")
+@jwt_required()
+def send_help_message(ticket_id):
+    try:
+        role = get_jwt().get("role")
+        uid = int(get_jwt_identity())
+
+        ticket = HelpTicket.query.get_or_404(ticket_id)
+        user = User.query.get_or_404(uid)
+
+        data = request.get_json() or {}
+        message = (data.get("message") or "").strip()
+
+        if not message:
+            return jsonify({"error": "message is required"}), 400
+
+        if ticket.status == "Closed":
+            return jsonify({"error": "This help ticket is closed"}), 400
+
+        if role not in ["Admin", "Staff"]:
+            return jsonify({"error": "Only Admin or Staff can reply in chat"}), 403
+
+        new_message = HelpMessage(
+            ticket_id=ticket.id,
+            sender_id=user.id,
+            sender_role=user.role,
+            message=message
+        )
+        db.session.add(new_message)
+
+        ticket.updated_at = datetime.utcnow()
+
+        db.session.add(Notification(
+            user_id=ticket.user_id,
+            title="Help Centre Reply",
+            message=f"{user.role} replied to your ticket: {ticket.subject}"
+        ))
+
+        db.session.commit()
+
+        return jsonify({
+            "message": "Reply sent successfully",
+            "reply": serialize_help_message(new_message)
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        print("SEND HELP MESSAGE ERROR:", e)
+        return jsonify({"error": "Failed to send message"}), 500
+
+
+@api.put("/help-centre/tickets/<int:ticket_id>/status")
+@jwt_required()
+def update_help_ticket_status(ticket_id):
+    if not require_roles("Admin", "Staff")():
+        return jsonify({"error": "Only Admin or Staff can update ticket status"}), 403
+
+    try:
+        ticket = HelpTicket.query.get_or_404(ticket_id)
+        data = request.get_json() or {}
+        status = (data.get("status") or "").strip()
+
+        if status not in ["Open", "Closed"]:
+            return jsonify({"error": "status must be Open or Closed"}), 400
+
+        ticket.status = status
+        ticket.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        return jsonify({
+            "message": "Ticket status updated successfully",
+            "ticket": serialize_help_ticket(ticket)
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print("UPDATE HELP TICKET STATUS ERROR:", e)
+        return jsonify({"error": "Failed to update help ticket status"}), 500
 
 
 @api.get("/complaints")

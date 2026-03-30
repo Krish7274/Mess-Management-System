@@ -243,18 +243,77 @@ Thank you for your payment.
     });
   }, [allBills, billingSearch]);
 
+  function renderProofCell(bill) {
+    const proofUrl = bill?.payment?.proof_url;
+
+    if (!proofUrl) {
+      return <span className="muted">No proof</span>;
+    }
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <a
+          href={proofUrl}
+          target="_blank"
+          rel="noreferrer"
+          style={{ textDecoration: "none" }}
+        >
+          <img
+            src={proofUrl}
+            alt="Payment Proof"
+            style={{
+              width: 90,
+              height: 90,
+              objectFit: "cover",
+              borderRadius: 12,
+              border: "1px solid rgba(0,0,0,0.12)",
+              boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
+              cursor: "pointer",
+              background: "#fff",
+            }}
+          />
+        </a>
+
+        <a
+          href={proofUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="btn btnBlue"
+          style={{
+            padding: "6px 10px",
+            fontSize: 12,
+            textAlign: "center",
+            textDecoration: "none",
+            width: "fit-content",
+          }}
+        >
+          View Proof
+        </a>
+      </div>
+    );
+  }
+
   return (
     <div className="grid">
       <div className="card">
         <h1>My Bills</h1>
 
         {msg && <div className="badge" style={{ marginBottom: 12 }}>{msg}</div>}
-        {err && <div className="card" style={{ borderColor: "rgba(239,68,68,.35)", marginBottom: 12 }}>{err}</div>}
+        {err && (
+          <div
+            className="card"
+            style={{ borderColor: "rgba(239,68,68,.35)", marginBottom: 12 }}
+          >
+            {err}
+          </div>
+        )}
 
         <div className="card" style={{ marginBottom: 14 }}>
           <h3 style={{ marginBottom: 8 }}>Generate Monthly Bill From Attendance</h3>
           <p className="muted" style={{ marginBottom: 8 }}>
-            Mark daily attendance as Taken. You can either pay each meal bill separately or generate one monthly bill from all unpaid meal attendance for a month.
+            Mark daily attendance as Taken. You can either pay each meal bill
+            separately or generate one monthly bill from all unpaid meal attendance
+            for a month.
           </p>
 
           {isAdmin && (
@@ -295,9 +354,38 @@ Thank you for your payment.
                   {b.included_meals_count ? ` • ${b.included_meals_count} meals` : ""}
                 </div>
 
+                {b.payment?.proof_url && (
+                  <div style={{ marginTop: 8 }}>
+                    <a
+                      href={b.payment.proof_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ textDecoration: "none" }}
+                    >
+                      <img
+                        src={b.payment.proof_url}
+                        alt="Payment Proof"
+                        style={{
+                          width: 90,
+                          height: 90,
+                          objectFit: "cover",
+                          borderRadius: 12,
+                          border: "1px solid rgba(0,0,0,0.12)",
+                          boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
+                          marginTop: 8,
+                          background: "#fff",
+                        }}
+                      />
+                    </a>
+                  </div>
+                )}
+
                 <div className="row" style={{ marginTop: 8 }}>
                   {b.can_pay && (
-                    <button className="btn btnBlue" onClick={() => openQrModal(b.id, b.amount)}>
+                    <button
+                      className="btn btnBlue"
+                      onClick={() => openQrModal(b.id, b.amount)}
+                    >
                       Pay (UPI)
                     </button>
                   )}
@@ -331,7 +419,11 @@ Thank you for your payment.
             Admin can still create manual daily or monthly bills from here.
           </p>
 
-          <select className="input" value={form.user_id} onChange={(e) => setForm({ ...form, user_id: e.target.value })}>
+          <select
+            className="input"
+            value={form.user_id}
+            onChange={(e) => setForm({ ...form, user_id: e.target.value })}
+          >
             <option value="">Select user</option>
             {users.map((x) => (
               <option key={x.id} value={x.id}>
@@ -347,7 +439,10 @@ Thank you for your payment.
               setForm({
                 ...form,
                 bill_type: e.target.value,
-                period: e.target.value === "daily" ? new Date().toISOString().slice(0, 10) : currentMonthValue(),
+                period:
+                  e.target.value === "daily"
+                    ? new Date().toISOString().slice(0, 10)
+                    : currentMonthValue(),
               })
             }
           >
@@ -372,7 +467,9 @@ Thank you for your payment.
             placeholder="Amount"
           />
 
-          <button className="btn btnRed" onClick={createBill}>Create</button>
+          <button className="btn btnRed" onClick={createBill}>
+            Create
+          </button>
         </div>
       )}
 
@@ -394,7 +491,14 @@ Thank you for your payment.
             />
           </div>
 
-          {allBillsErr && <div className="card" style={{ borderColor: "rgba(239,68,68,.35)", marginBottom: 12 }}>{allBillsErr}</div>}
+          {allBillsErr && (
+            <div
+              className="card"
+              style={{ borderColor: "rgba(239,68,68,.35)", marginBottom: 12 }}
+            >
+              {allBillsErr}
+            </div>
+          )}
 
           {filteredAllBills.length === 0 ? (
             <p className="muted">No billing records found</p>
@@ -410,18 +514,24 @@ Thank you for your payment.
                     <th>Amount</th>
                     <th>Status</th>
                     <th>Meals</th>
+                    <th>Proof</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredAllBills.map((b) => (
                     <tr key={b.id}>
-                      <td>{b.user_name}<br /><span className="muted">{b.user_email}</span></td>
+                      <td>
+                        {b.user_name}
+                        <br />
+                        <span className="muted">{b.user_email}</span>
+                      </td>
                       <td>{b.period}</td>
                       <td>{b.bill_type}</td>
                       <td>{b.meal_type || "-"}</td>
                       <td>₹{b.amount}</td>
                       <td>{b.status}</td>
                       <td>{b.included_meals_count || 0}</td>
+                      <td>{renderProofCell(b)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -435,8 +545,20 @@ Thank you for your payment.
         <div className="modalOverlay" onClick={closeQrModal}>
           <div className="modalCard" onClick={(e) => e.stopPropagation()}>
             <h2 style={{ marginBottom: 10 }}>UPI Payment</h2>
-            <p className="muted" style={{ marginBottom: 10 }}>Amount to pay: ₹{selectedBillAmount}</p>
-            <img src={upiQr} alt="UPI QR" style={{ width: 220, maxWidth: "100%", borderRadius: 12, marginBottom: 14 }} />
+            <p className="muted" style={{ marginBottom: 10 }}>
+              Amount to pay: ₹{selectedBillAmount}
+            </p>
+
+            <img
+              src={upiQr}
+              alt="UPI QR"
+              style={{
+                width: 220,
+                maxWidth: "100%",
+                borderRadius: 12,
+                marginBottom: 14,
+              }}
+            />
 
             <textarea
               className="input"
@@ -446,24 +568,64 @@ Thank you for your payment.
               onChange={(e) => setPaymentNote(e.target.value)}
             />
 
-            <input className="input" type="file" accept="image/*" onChange={(e) => setPaymentProof(e.target.files?.[0] || null)} />
+            <input
+              className="input"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setPaymentProof(e.target.files?.[0] || null)}
+            />
 
             <div className="row" style={{ marginTop: 10 }}>
-              <button className="btn btnBlue" onClick={markBillPaid}>I Have Paid</button>
-              <button className="btn btnRed" onClick={closeQrModal}>Close</button>
+              <button className="btn btnBlue" onClick={markBillPaid}>
+                I Have Paid
+              </button>
+              <button className="btn btnRed" onClick={closeQrModal}>
+                Close
+              </button>
             </div>
 
-            {paymentSuccess && <div className="badge" style={{ marginTop: 12 }}>{paymentSuccessMessage}</div>}
+            {paymentSuccess && (
+              <div className="badge" style={{ marginTop: 12 }}>
+                {paymentSuccessMessage}
+              </div>
+            )}
 
             {receiptData && (
               <div className="card" style={{ marginTop: 12 }}>
                 <h3 style={{ marginBottom: 8 }}>Receipt Ready</h3>
                 <p className="muted" style={{ marginBottom: 8 }}>
-                  Receipt No: {receiptData.receipt_no}<br />
-                  Bill Type: {receiptData.bill_type}<br />
-                  Period: {receiptData.period}<br />
+                  Receipt No: {receiptData.receipt_no}
+                  <br />
+                  Bill Type: {receiptData.bill_type}
+                  <br />
+                  Period: {receiptData.period}
+                  <br />
                   Amount: ₹{receiptData.amount}
                 </p>
+
+                {receiptData.proof_url && (
+                  <a
+                    href={receiptData.proof_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ textDecoration: "none", display: "inline-block", marginBottom: 10 }}
+                  >
+                    <img
+                      src={receiptData.proof_url}
+                      alt="Receipt Proof"
+                      style={{
+                        width: 110,
+                        height: 110,
+                        objectFit: "cover",
+                        borderRadius: 12,
+                        border: "1px solid rgba(0,0,0,0.12)",
+                        boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
+                        background: "#fff",
+                      }}
+                    />
+                  </a>
+                )}
+
                 <button className="btn btnBlue" onClick={() => downloadReceipt(receiptData)}>
                   Download Receipt
                 </button>

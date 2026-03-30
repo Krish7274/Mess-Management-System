@@ -272,9 +272,7 @@ export default function Menu() {
         return haystack.includes(q);
       });
 
-      return (
-        String(menu.week_start || "").toLowerCase().includes(q) || matchDay
-      );
+      return String(menu.week_start || "").toLowerCase().includes(q) || matchDay;
     });
   }, [weeklyMenus, weeklySearch]);
 
@@ -380,10 +378,11 @@ export default function Menu() {
       ) : null}
 
       {canManage ? (
-        <div className="card">
+        <div className="card weekly-form-card">
           <div className="menuWeeklyHeader">
             <div>
               <h2>{editingWeeklyId ? "Edit Weekly Menu" : "Weekly Menu"}</h2>
+              <p className="muted">Compact weekly form with cleaner layout</p>
             </div>
 
             {editingWeeklyId ? (
@@ -394,8 +393,8 @@ export default function Menu() {
           </div>
 
           <form onSubmit={saveWeeklyMenu}>
-            <div className="menuWeekStartRow">
-              <div>
+            <div className="menuWeekStartWrap">
+              <div className="menuWeekStartCard">
                 <label className="menuLabel">Week Start Date</label>
                 <input
                   className="input"
@@ -406,81 +405,103 @@ export default function Menu() {
               </div>
             </div>
 
-            <div className="weeklyMenuGrid">
+            <div className="weeklyMenuGrid compactWeeklyMenuGrid">
               {DAYS.map((day) => {
                 const weekDates = getWeekDateMap(weekStart);
 
                 return (
-                  <div key={day} className="weeklyDayCard">
-                    <h3>
-                      {day}
-                      <span className="menuDayDate">{weekDates[day]}</span>
-                    </h3>
-
-                    {MEALS.map((meal) => (
-                      <div key={meal} className="weeklyMealBlock">
-                        <label className="menuLabel">{meal}</label>
-
-                        <textarea
-                          className="input"
-                          rows="2"
-                          placeholder={`${meal} items`}
-                          value={weeklyItems[day][meal].items}
-                          onChange={(e) =>
-                            updateWeeklyField(day, meal, "items", e.target.value)
-                          }
-                        />
-
-                        <input
-                          className="input"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder={`${meal} price`}
-                          value={weeklyItems[day][meal].price}
-                          onChange={(e) =>
-                            updateWeeklyField(day, meal, "price", e.target.value)
-                          }
-                        />
+                  <div key={day} className="weeklyDayCard modernWeeklyDayCard">
+                    <div className="weeklyDayCardHeader">
+                      <div>
+                        <h3>{day}</h3>
+                        <span className="menuDayDate">{weekDates[day]}</span>
                       </div>
-                    ))}
+                      <div className="weeklyDayBadge"></div>
+                    </div>
+
+                    <div className="weeklyMealGrid">
+                      {MEALS.map((meal) => (
+                        <div key={meal} className="weeklyMealBlock modernMealBlock">
+                          <div className="weeklyMealTop">
+                            <span
+                              className={`formMealBadge ${
+                                meal === "Breakfast"
+                                  ? "breakfast"
+                                  : meal === "Lunch"
+                                  ? "lunch"
+                                  : "dinner"
+                              }`}
+                            >
+                              {meal}
+                            </span>
+                          </div>
+
+                          <textarea
+                            className="input compactInput"
+                            rows="2"
+                            placeholder={`${meal} items`}
+                            value={weeklyItems[day][meal].items}
+                            onChange={(e) =>
+                              updateWeeklyField(day, meal, "items", e.target.value)
+                            }
+                          />
+
+                          <input
+                            className="input compactInput"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder={`${meal} price`}
+                            value={weeklyItems[day][meal].price}
+                            onChange={(e) =>
+                              updateWeeklyField(day, meal, "price", e.target.value)
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 );
               })}
             </div>
 
-            <button className="btn btnBlue" type="submit">
-              {editingWeeklyId ? "Update Weekly Menu" : "Save Weekly Menu"}
-            </button>
+            <div className="weeklyFormActionRow">
+              <button className="btn btnBlue" type="submit">
+                {editingWeeklyId ? "Update Weekly Menu" : "Save Weekly Menu"}
+              </button>
+            </div>
           </form>
         </div>
       ) : null}
 
-      <div className="card">
-        <div className="menuSearchHeader">
+      <div className="card weekly-menu-page">
+        <div className="weekly-menu-header">
           <div>
-            <h2>Weekly Menu List</h2>
-            <p className="muted">
+            <h2 className="weekly-menu-title">Weekly Menu List</h2>
+            <p className="weekly-menu-subtitle">
               Search by day name, date, item, or price. Example: Monday, 24-03-2026, Lunch
             </p>
+            <span className="weekly-menu-updated">
+              Compact, modern weekly menu view
+            </span>
           </div>
         </div>
 
         <input
           className="input menuSearchInput"
-          placeholder="Search weekly menu by day or date..."
+          placeholder="Search weekly menu by day, date, item, or price..."
           value={weeklySearch}
           onChange={(e) => setWeeklySearch(e.target.value)}
         />
 
         {weeklyLoading ? (
-          <p className="muted">Loading weekly menu...</p>
+          <div className="menu-loading">Loading weekly menu...</div>
         ) : filteredWeeklyMenus.length === 0 ? (
-          <p className="muted">
+          <div className="menu-empty">
             {weeklySearch.trim()
               ? "No weekly menu found for this search."
               : "No weekly menu found."}
-          </p>
+          </div>
         ) : (
           <div className="weeklyDisplayWrap">
             {filteredWeeklyMenus.map((menu) => {
@@ -532,30 +553,47 @@ export default function Menu() {
                     ) : null}
                   </div>
 
-                  <div className="weeklyDisplayGrid">
+                  <div className="weekly-menu-grid">
                     {visibleDays.map((day) => (
-                      <div key={day} className="weeklyDisplayDay">
-                        <h4>
-                          {day}
-                          <span className="menuDayDate">{weekDates[day]}</span>
-                        </h4>
+                      <div key={day} className="menu-day-card">
+                        <div className="menu-day-top">
+                          <div>
+                            <h3>{day}</h3>
+                            <p>{weekDates[day]}</p>
+                          </div>
+                          <div className="menu-day-dot"></div>
+                        </div>
 
-                        {MEALS.map((meal) => {
-                          const entry = menu.weekly_items?.[day]?.[meal] || {
-                            items: "",
-                            price: "",
-                          };
+                        <div className="meal-list">
+                          {MEALS.map((meal) => {
+                            const entry = menu.weekly_items?.[day]?.[meal] || {
+                              items: "",
+                              price: "",
+                            };
 
-                          return (
-                            <div key={meal} className="weeklyDisplayMeal">
-                              <strong>{meal}</strong>
-                              <p>{entry.items || "-"}</p>
-                              <span className="weeklyPriceTag">
-                                ₹ {entry.price !== "" && entry.price !== null ? entry.price : 0}
-                              </span>
-                            </div>
-                          );
-                        })}
+                            const mealClass =
+                              meal === "Breakfast"
+                                ? "breakfast"
+                                : meal === "Lunch"
+                                ? "lunch"
+                                : "dinner";
+
+                            return (
+                              <div key={meal} className="meal-item">
+                                <div className="meal-title-row">
+                                  <span className={`meal-badge ${mealClass}`}>{meal}</span>
+                                  <span className="meal-price">
+                                    ₹{" "}
+                                    {entry.price !== "" && entry.price !== null
+                                      ? entry.price
+                                      : 0}
+                                  </span>
+                                </div>
+                                <p>{entry.items || "Not added"}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     ))}
                   </div>

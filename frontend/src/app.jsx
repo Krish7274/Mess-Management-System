@@ -14,6 +14,7 @@ import Inventory from "./pages/Inventory";
 import Complaints from "./pages/Complaints";
 import Notifications from "./pages/Notifications";
 import AdminUsers from "./pages/AdminUsers";
+import HelpCentre from "./pages/HelpCentre";
 
 export default function App() {
   return (
@@ -81,6 +82,15 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={["Admin", "Staff", "User"]}>
                 <Complaints />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="help-centre"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Staff", "User"]}>
+                <HelpCentre />
               </ProtectedRoute>
             }
           />

@@ -52,6 +52,16 @@ export default function Sidebar() {
       </nav>
 
       <div className="topbarRight">
+        <NavLink
+          to="/app/help-centre"
+          className={({ isActive }) =>
+            isActive ? "helpTopBtn active" : "helpTopBtn"
+          }
+        >
+          <span className="helpTopBtnIcon">🛟</span>
+          <span>Help Centre</span>
+        </NavLink>
+
         <button className="logoutBtn" onClick={handleLogout}>
           Logout
         </button>
