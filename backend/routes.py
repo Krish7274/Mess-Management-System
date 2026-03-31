@@ -1199,7 +1199,6 @@ def attendance_list():
 
     q = Attendance.query
 
-    # Users can only see their own attendance
     if role not in ["Admin", "Staff"]:
         q = q.filter_by(user_id=uid)
 
@@ -1224,20 +1223,17 @@ def attendance_list():
             "status": a.status
         }
         for a in items
-    ]), 200
+    ])
 
 
 @api.post("/attendance")
 @jwt_required()
 def mark_attendance():
     try:
-        role = get_jwt().get("role")
-
-        # Only Admin / Staff can mark attendance
-        if role not in ["Admin", "Staff"]:
-            return jsonify({"error": "Only Admin or Staff can mark attendance"}), 403
-
         data = request.get_json() or {}
+
+        role = get_jwt().get("role")
+        logged_in_uid = int(get_jwt_identity())
 
         date = normalize_to_iso_date(data.get("date"))
         meal_type = (data.get("meal_type") or "").strip()
@@ -1252,17 +1248,13 @@ def mark_attendance():
         if status not in ["Taken", "Skipped"]:
             return jsonify({"error": "status must be Taken/Skipped"}), 400
 
-        if data.get("user_id") is None:
-            return jsonify({"error": "user_id is required"}), 400
+        target_user_id = logged_in_uid
 
-        try:
-            target_user_id = int(data.get("user_id"))
-        except Exception:
-            return jsonify({"error": "user_id must be a number"}), 400
-
-        target_user = User.query.get(target_user_id)
-        if not target_user:
-            return jsonify({"error": "Selected user not found"}), 404
+        if role in ["Admin", "Staff"] and data.get("user_id") is not None:
+            try:
+                target_user_id = int(data.get("user_id"))
+            except Exception:
+                return jsonify({"error": "user_id must be a number"}), 400
 
         existing = Attendance.query.filter_by(
             user_id=target_user_id,
@@ -1972,7 +1964,7 @@ def create_bill():
                     amount
                 )
             except Exception as mail_error:
-                print("SEND BILL EMAIL ERROR:", mail_error)
+                print("BILL EMAIL ERROR:", mail_error)
 
         return jsonify({
             "message": "Bill created successfully",
@@ -2000,7 +1992,7 @@ def generate_monthly_bill_from_attendance():
             return jsonify({"error": "period must be in YYYY-MM format"}), 400
 
         target_user_id = logged_in_user_id
-        if role == "Admin" and data.get("user_id") is not None:
+        if role in ["Admin", "Staff"] and data.get("user_id") is not None:
             try:
                 target_user_id = int(data.get("user_id"))
             except Exception:
@@ -2084,7 +2076,7 @@ def my_bills():
 @api.get("/billing/all")
 @jwt_required()
 def all_bills():
-    if not require_roles("Admin")():
+    if not require_roles("Admin", "Staff")():
         return jsonify({"error": "Forbidden"}), 403
 
     try:
@@ -2118,7 +2110,7 @@ def pay_bill():
         bill = Bill.query.get_or_404(bill_id)
 
         role = get_jwt().get("role")
-        if role != "Admin" and bill.user_id != user_id:
+        if role not in ["Admin", "Staff"] and bill.user_id != user_id:
             return jsonify({"error": "You can pay only your own bill"}), 403
 
         if bill.parent_bill_id:
@@ -2166,45 +2158,51 @@ def pay_bill():
                 "amount": bill.amount,
                 "mode": mode,
                 "paid_at": payment.paid_at.isoformat() if payment.paid_at else datetime.utcnow().isoformat(),
-                "proof_url": f"http://127.0.0.1:5000/api/uploads/{proof_filename}" if proof_filename else None,
-                "included_meals_count": Bill.query.filter_by(parent_bill_id=bill.id).count()
+                "proof_url": f"http://127.0.0.1:5000/api/uploads/{proof_filename}" if proof_filename else None
             }
         }), 200
 
     except Exception as e:
         db.session.rollback()
         print("PAY BILL ERROR:", e)
-        return jsonify({"error": "Failed to update payment"}), 500
+        return jsonify({"error": "Failed to record payment"}), 500
 
 
 @api.get("/billing/receipt/<int:bill_id>")
 @jwt_required()
-def get_receipt(bill_id):
+def billing_receipt(bill_id):
     try:
         user_id = int(get_jwt_identity())
         role = get_jwt().get("role")
-        bill = Bill.query.get_or_404(bill_id)
 
-        if role != "Admin" and bill.user_id != user_id:
+        bill = Bill.query.get_or_404(bill_id)
+        if role not in ["Admin", "Staff"] and bill.user_id != user_id:
             return jsonify({"error": "Forbidden"}), 403
 
         payment = Payment.query.filter_by(bill_id=bill.id).order_by(Payment.id.desc()).first()
-        if not payment:
-            return jsonify({"error": "Receipt not found"}), 404
+        user = User.query.get(bill.user_id)
 
         return jsonify({
-            "receipt_no": payment.receipt_no,
             "bill_id": bill.id,
             "bill_type": bill.bill_type,
             "meal_type": bill.meal_type,
             "period": bill.month,
             "amount": bill.amount,
-            "mode": payment.mode,
-            "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
-            "proof_url": f"http://127.0.0.1:5000/api/uploads/{payment.proof_filename}" if payment.proof_filename else None,
-            "included_meals_count": Bill.query.filter_by(parent_bill_id=bill.id).count()
+            "status": bill.status,
+            "user": {
+                "id": user.id if user else None,
+                "name": user.name if user else "Unknown",
+                "email": user.email if user else "Unknown"
+            },
+            "payment": {
+                "mode": payment.mode if payment else None,
+                "receipt_no": payment.receipt_no if payment else None,
+                "paid_at": payment.paid_at.isoformat() if payment and payment.paid_at else None,
+                "proof_url": f"http://127.0.0.1:5000/api/uploads/{payment.proof_filename}" if payment and payment.proof_filename else None,
+                "note": payment.note if payment else None
+            } if payment else None
         }), 200
 
     except Exception as e:
-        print("GET RECEIPT ERROR:", e)
-        return jsonify({"error": "Failed to fetch receipt"}), 500
+        print("RECEIPT ERROR:", e)
+        return jsonify({"error": "Failed to load receipt"}), 500

@@ -1,636 +1,471 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../api";
 import { getUser } from "../auth";
-import upiQr from "../assets/upi-qr.jpeg";
 
-function currentMonthValue() {
-  return new Date().toISOString().slice(0, 7);
+const UPI_ID = "ptlkrish27@oksbi";
+const UPI_NAME = "Krish Patel";
+
+function formatMoney(value) {
+  const num = Number(value || 0);
+  return `₹${num.toFixed(2)}`;
+}
+
+function formatPeriod(period, billType) {
+  if (!period) return "-";
+
+  if (billType === "monthly") {
+    const [y, m] = String(period).split("-");
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December",
+    ];
+
+    if (y && m) {
+      return `${monthNames[Number(m) - 1] || m}, ${y}`;
+    }
+  }
+
+  return period;
+}
+
+function buildUpiLink(bill) {
+  const amount = Number(bill?.amount || 0).toFixed(2);
+  const title = bill?.bill_type === "monthly" ? "Monthly Bill" : "Meal Bill";
+  const note = `${title} - ${bill?.period || ""}${bill?.meal_type ? ` - ${bill.meal_type}` : ""}`;
+
+  return `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent(
+    UPI_NAME
+  )}&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(note)}`;
+}
+
+function buildQrUrl(bill) {
+  const upiLink = buildUpiLink(bill);
+  return `https://quickchart.io/qr?size=260&text=${encodeURIComponent(upiLink)}`;
+}
+
+function getSearchableText(bill) {
+  return [
+    bill?.period,
+    bill?.bill_type,
+    bill?.meal_type,
+    bill?.status,
+    bill?.user_name,
+    bill?.user_email,
+    bill?.amount,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
 }
 
 export default function Billing() {
-  const u = getUser();
-  const isAdmin = u?.role === "Admin";
+  const user = getUser();
+  const role = user?.role || "";
+  const isAdminOrStaff = role === "Admin" || role === "Staff";
 
-  const [myBills, setMyBills] = useState([]);
-  const [allBills, setAllBills] = useState([]);
+  const [bills, setBills] = useState([]);
   const [users, setUsers] = useState([]);
-  const [billingSearch, setBillingSearch] = useState("");
-  const [monthlyPeriod, setMonthlyPeriod] = useState(currentMonthValue());
-  const [monthlyUserId, setMonthlyUserId] = useState("");
-
-  const [form, setForm] = useState({
-    user_id: "",
-    bill_type: "monthly",
-    period: currentMonthValue(),
-    amount: 1500,
-  });
-
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [monthPeriod, setMonthPeriod] = useState(new Date().toISOString().slice(0, 7));
+  const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
-  const [allBillsErr, setAllBillsErr] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [showQrModal, setShowQrModal] = useState(false);
-  const [selectedBillId, setSelectedBillId] = useState(null);
-  const [selectedBillAmount, setSelectedBillAmount] = useState("");
-  const [paymentProof, setPaymentProof] = useState(null);
-  const [paymentNote, setPaymentNote] = useState("");
-  const [receiptData, setReceiptData] = useState(null);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [paymentSuccessMessage, setPaymentSuccessMessage] = useState("");
+  const [selectedBill, setSelectedBill] = useState(null);
+  const [note, setNote] = useState("");
+  const [proof, setProof] = useState(null);
+  const [paying, setPaying] = useState(false);
 
-  async function loadMyBills() {
+  async function loadBills() {
     try {
-      const res = await api.get("/billing/my");
-      setMyBills(res.data || []);
+      setErr("");
+      const res = await api.get(isAdminOrStaff ? "/billing/all" : "/billing/my");
+      setBills(res.data || []);
     } catch (e) {
       setErr(e?.response?.data?.error || "Failed to load bills");
     }
   }
 
-  async function loadAllBills() {
-    if (!isAdmin) return;
-
-    try {
-      setAllBillsErr("");
-      const res = await api.get("/billing/all");
-      setAllBills(Array.isArray(res.data) ? res.data : []);
-    } catch (e) {
-      setAllBills([]);
-      setAllBillsErr(e?.response?.data?.error || "Failed to load all users billing list");
-    }
-  }
-
   async function loadUsers() {
-    if (!isAdmin) return;
+    if (!isAdminOrStaff) return;
 
     try {
       const res = await api.get("/users");
-      const list = res.data || [];
-      setUsers(list);
-      if (!monthlyUserId && list.length > 0) {
-        setMonthlyUserId(String(list[0].id));
+      const onlyUsers = (res.data || []).filter((u) => u.role === "User");
+      setUsers(onlyUsers);
+
+      if (onlyUsers.length > 0) {
+        setSelectedUserId(String(onlyUsers[0].id));
       }
     } catch {
-      setUsers([]);
+      // ignore
     }
   }
 
   useEffect(() => {
-    loadMyBills();
+    loadBills();
     loadUsers();
-    loadAllBills();
-  }, []);
+  }, [isAdminOrStaff]);
 
-  async function createBill() {
-    setMsg("");
-    setErr("");
-
-    if (!form.user_id || !form.period || !form.amount) {
-      setErr("Select user, bill type, period and amount");
-      return;
-    }
-
+  async function generateMonthlyBill() {
     try {
-      const res = await api.post("/billing/create", {
-        user_id: Number(form.user_id),
-        bill_type: form.bill_type,
-        period: form.period,
-        amount: Number(form.amount),
-      });
+      setLoading(true);
+      setMsg("");
+      setErr("");
 
-      setMsg(res.data?.message || "Bill created successfully");
-      setForm({
-        user_id: "",
-        bill_type: "monthly",
-        period: currentMonthValue(),
-        amount: 1500,
-      });
+      const payload = { period: monthPeriod };
 
-      loadMyBills();
-      loadAllBills();
-    } catch (e) {
-      setErr(e?.response?.data?.error || "Failed to create bill");
-    }
-  }
-
-  async function generateMonthlyAttendanceBill() {
-    setMsg("");
-    setErr("");
-
-    try {
-      const payload = { period: monthlyPeriod };
-      if (isAdmin && monthlyUserId) {
-        payload.user_id = Number(monthlyUserId);
+      if (isAdminOrStaff && selectedUserId) {
+        payload.user_id = Number(selectedUserId);
       }
 
       const res = await api.post("/billing/generate-monthly", payload);
       setMsg(res.data?.message || "Monthly attendance bill generated successfully");
-      loadMyBills();
-      loadAllBills();
+      await loadBills();
     } catch (e) {
-      setErr(e?.response?.data?.error || "Failed to generate monthly attendance bill");
+      setErr(e?.response?.data?.error || "Failed to generate monthly bill");
+    } finally {
+      setLoading(false);
     }
   }
 
-  function openQrModal(billId, amount) {
-    setSelectedBillId(billId);
-    setSelectedBillAmount(amount);
-    setPaymentProof(null);
-    setPaymentNote("");
-    setReceiptData(null);
-    setPaymentSuccess(false);
-    setPaymentSuccessMessage("");
+  function openPayModal(bill) {
+    setSelectedBill(bill);
+    setNote("");
+    setProof(null);
     setShowQrModal(true);
   }
 
-  function closeQrModal() {
+  function closePayModal() {
     setShowQrModal(false);
-    setSelectedBillId(null);
-    setSelectedBillAmount("");
-    setPaymentProof(null);
-    setPaymentNote("");
-    setReceiptData(null);
-    setPaymentSuccess(false);
-    setPaymentSuccessMessage("");
+    setSelectedBill(null);
+    setNote("");
+    setProof(null);
   }
 
-  async function markBillPaid() {
+  async function submitPayment() {
+    if (!selectedBill) return;
+
     try {
+      setPaying(true);
+      setMsg("");
       setErr("");
 
-      if (!selectedBillId) {
-        setErr("No bill selected");
-        return;
-      }
-
       const formData = new FormData();
-      formData.append("bill_id", selectedBillId);
+      formData.append("bill_id", selectedBill.id);
       formData.append("mode", "UPI");
-      formData.append("note", paymentNote || "");
+      formData.append("note", note);
 
-      if (paymentProof) {
-        formData.append("proof", paymentProof);
+      if (proof) {
+        formData.append("proof", proof);
       }
 
-      await api.post("/billing/pay", formData, {
+      const res = await api.post("/billing/pay", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const receiptRes = await api.get(`/billing/receipt/${selectedBillId}`);
-      setReceiptData(receiptRes.data || null);
-      setPaymentSuccess(true);
-      setPaymentSuccessMessage("Payment recorded successfully");
-
-      loadMyBills();
-      loadAllBills();
+      setMsg(res.data?.message || "Payment recorded successfully");
+      closePayModal();
+      await loadBills();
     } catch (e) {
       setErr(e?.response?.data?.error || "Failed to update payment");
+    } finally {
+      setPaying(false);
     }
   }
 
-  function downloadReceipt(receipt) {
-    if (!receipt) return;
+  const filteredBills = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return bills;
+    return bills.filter((bill) => getSearchableText(bill).includes(q));
+  }, [bills, searchTerm]);
 
-    const content = `
-MESS MANAGEMENT SYSTEM PAYMENT RECEIPT
--------------------------------------
-Receipt No : ${receipt.receipt_no}
-Bill ID    : ${receipt.bill_id}
-Bill Type  : ${receipt.bill_type}
-Meal Type  : ${receipt.meal_type || "-"}
-Period     : ${receipt.period}
-Amount     : ₹${receipt.amount}
-Mode       : ${receipt.mode}
-Paid At    : ${receipt.paid_at}
-Meals Inc. : ${receipt.included_meals_count || 0}
-Proof URL  : ${receipt.proof_url || "No proof uploaded"}
+  const unpaidBills = useMemo(
+    () => filteredBills.filter((b) => b.status === "Unpaid" && b.can_pay),
+    [filteredBills]
+  );
 
-Thank you for your payment.
-    `.trim();
-
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${receipt.receipt_no}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-  }
-
-  const filteredAllBills = useMemo(() => {
-    const q = billingSearch.trim().toLowerCase();
-    if (!q) return allBills;
-
-    return allBills.filter((bill) => {
-      const text = [
-        bill.user_name,
-        bill.user_email,
-        bill.bill_type,
-        bill.meal_type,
-        bill.period,
-        bill.amount,
-        bill.status,
-        bill.payment?.mode,
-        bill.payment?.receipt_no,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return text.includes(q);
-    });
-  }, [allBills, billingSearch]);
-
-  function renderProofCell(bill) {
-    const proofUrl = bill?.payment?.proof_url;
-
-    if (!proofUrl) {
-      return <span className="muted">No proof</span>;
-    }
-
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <a
-          href={proofUrl}
-          target="_blank"
-          rel="noreferrer"
-          style={{ textDecoration: "none" }}
-        >
-          <img
-            src={proofUrl}
-            alt="Payment Proof"
-            style={{
-              width: 90,
-              height: 90,
-              objectFit: "cover",
-              borderRadius: 12,
-              border: "1px solid rgba(0,0,0,0.12)",
-              boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-              cursor: "pointer",
-              background: "#fff",
-            }}
-          />
-        </a>
-
-        <a
-          href={proofUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="btn btnBlue"
-          style={{
-            padding: "6px 10px",
-            fontSize: 12,
-            textAlign: "center",
-            textDecoration: "none",
-            width: "fit-content",
-          }}
-        >
-          View Proof
-        </a>
-      </div>
-    );
-  }
+  const paidBills = useMemo(
+    () => filteredBills.filter((b) => b.status === "Paid"),
+    [filteredBills]
+  );
 
   return (
-    <div className="grid">
-      <div className="card">
-        <h1>My Bills</h1>
-
-        {msg && <div className="badge" style={{ marginBottom: 12 }}>{msg}</div>}
-        {err && (
-          <div
-            className="card"
-            style={{ borderColor: "rgba(239,68,68,.35)", marginBottom: 12 }}
-          >
-            {err}
-          </div>
-        )}
-
-        <div className="card" style={{ marginBottom: 14 }}>
-          <h3 style={{ marginBottom: 8 }}>Generate Monthly Bill From Attendance</h3>
-          <p className="muted" style={{ marginBottom: 8 }}>
-            Mark daily attendance as Taken. You can either pay each meal bill
-            separately or generate one monthly bill from all unpaid meal attendance
-            for a month.
-          </p>
-
-          {isAdmin && (
-            <select
-              className="input"
-              value={monthlyUserId}
-              onChange={(e) => setMonthlyUserId(e.target.value)}
-            >
-              {users.map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.name} ({x.email})
-                </option>
-              ))}
-            </select>
-          )}
-
-          <input
-            className="input"
-            type="month"
-            value={monthlyPeriod}
-            onChange={(e) => setMonthlyPeriod(e.target.value)}
-          />
-
-          <button className="btn btnBlue" onClick={generateMonthlyAttendanceBill}>
-            Generate Monthly Attendance Bill
-          </button>
-        </div>
-
-        {myBills.length === 0 ? (
-          <p className="muted">No bills found</p>
-        ) : (
-          <ul className="muted">
-            {myBills.map((b) => (
-              <li key={b.id} style={{ marginBottom: 14 }}>
-                <div>
-                  <b>{b.period}</b> • {b.bill_type === "daily" ? "Daily" : "Monthly"}
-                  {b.meal_type ? ` • ${b.meal_type}` : ""} • ₹{b.amount} • <b>{b.status}</b>
-                  {b.included_meals_count ? ` • ${b.included_meals_count} meals` : ""}
-                </div>
-
-                {b.payment?.proof_url && (
-                  <div style={{ marginTop: 8 }}>
-                    <a
-                      href={b.payment.proof_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ textDecoration: "none" }}
-                    >
-                      <img
-                        src={b.payment.proof_url}
-                        alt="Payment Proof"
-                        style={{
-                          width: 90,
-                          height: 90,
-                          objectFit: "cover",
-                          borderRadius: 12,
-                          border: "1px solid rgba(0,0,0,0.12)",
-                          boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-                          marginTop: 8,
-                          background: "#fff",
-                        }}
-                      />
-                    </a>
-                  </div>
-                )}
-
-                <div className="row" style={{ marginTop: 8 }}>
-                  {b.can_pay && (
-                    <button
-                      className="btn btnBlue"
-                      onClick={() => openQrModal(b.id, b.amount)}
-                    >
-                      Pay (UPI)
-                    </button>
-                  )}
-
-                  {b.status === "Paid" && b.payment?.receipt_no && (
-                    <button
-                      className="btn btnRed"
-                      onClick={async () => {
-                        try {
-                          const res = await api.get(`/billing/receipt/${b.id}`);
-                          downloadReceipt(res.data);
-                        } catch {
-                          setErr("Could not download receipt");
-                        }
-                      }}
-                    >
-                      Receipt
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {isAdmin && (
-        <div className="card">
-          <h1>Admin Create Manual Bill</h1>
-          <p className="muted" style={{ marginBottom: 12 }}>
-            Admin can still create manual daily or monthly bills from here.
-          </p>
-
-          <select
-            className="input"
-            value={form.user_id}
-            onChange={(e) => setForm({ ...form, user_id: e.target.value })}
-          >
-            <option value="">Select user</option>
-            {users.map((x) => (
-              <option key={x.id} value={x.id}>
-                {x.name} ({x.email})
-              </option>
-            ))}
-          </select>
-
-          <select
-            className="input"
-            value={form.bill_type}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                bill_type: e.target.value,
-                period:
-                  e.target.value === "daily"
-                    ? new Date().toISOString().slice(0, 10)
-                    : currentMonthValue(),
-              })
-            }
-          >
-            <option value="monthly">Monthly Bill</option>
-            <option value="daily">Daily Bill</option>
-          </select>
-
-          <input
-            className="input"
-            type={form.bill_type === "daily" ? "date" : "month"}
-            value={form.period}
-            onChange={(e) => setForm({ ...form, period: e.target.value })}
-          />
-
-          <input
-            className="input"
-            type="number"
-            min="0"
-            step="0.01"
-            value={form.amount}
-            onChange={(e) => setForm({ ...form, amount: e.target.value })}
-            placeholder="Amount"
-          />
-
-          <button className="btn btnRed" onClick={createBill}>
-            Create
-          </button>
-        </div>
-      )}
-
-      {isAdmin && (
-        <div className="card" style={{ gridColumn: "1 / -1" }}>
-          <div className="searchBarWrap" style={{ marginBottom: 14 }}>
+    <div className="billingPage">
+      <div className="billingMain">
+        <div className="card billingMainCard">
+          <div className="billingHeader">
             <div>
-              <h1 style={{ marginBottom: 6 }}>All Users Billing List</h1>
-              <p className="muted" style={{ marginBottom: 0 }}>
-                Search by user name, email, bill type, period, meal type, amount, or status.
+              <h1>{isAdminOrStaff ? "All Bills" : "My Bills"}</h1>
+              <p className="muted">
+                {isAdminOrStaff
+                  ? "View all users bills, search records, generate monthly bills, and complete UPI payments."
+                  : "View your bills, search records, generate monthly bills, and complete UPI payments."}
               </p>
             </div>
-
-            <input
-              className="input searchInput"
-              placeholder="Search billing user..."
-              value={billingSearch}
-              onChange={(e) => setBillingSearch(e.target.value)}
-            />
           </div>
 
-          {allBillsErr && (
-            <div
-              className="card"
-              style={{ borderColor: "rgba(239,68,68,.35)", marginBottom: 12 }}
-            >
-              {allBillsErr}
-            </div>
-          )}
+          {msg && <div className="status-box status-success">{msg}</div>}
+          {err && <div className="status-box status-error">{err}</div>}
 
-          {filteredAllBills.length === 0 ? (
-            <p className="muted">No billing records found</p>
-          ) : (
+          <div className="card billingGenerateCard">
+            <div className="billingGenerateHeader">
+              <div>
+                <h2>Generate Monthly Bill From Attendance</h2>
+                <p className="muted">
+                  Mark daily attendance as Taken. You can pay each meal bill separately
+                  or generate one monthly bill from all unpaid meal attendance for a month.
+                </p>
+              </div>
+            </div>
+
+            <div className="billingGenerateGrid">
+              {isAdminOrStaff && (
+                <div>
+                  <label className="muted">Select Student</label>
+                  <select
+                    className="input"
+                    value={selectedUserId}
+                    onChange={(e) => setSelectedUserId(e.target.value)}
+                  >
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="muted">Month</label>
+                <input
+                  className="input"
+                  type="month"
+                  value={monthPeriod}
+                  onChange={(e) => setMonthPeriod(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="billingGenerateAction">
+              <button className="btn btnBlue" disabled={loading} onClick={generateMonthlyBill}>
+                Generate Monthly Attendance Bill
+              </button>
+            </div>
+          </div>
+
+          <div className="billingSearchWrap">
+            <div className="billingSearchLeft">
+              <label className="muted">Search Bills</label>
+              <input
+                className="input billingSearchInput"
+                type="text"
+                placeholder={
+                  isAdminOrStaff
+                    ? "Search by date, month, bill type, meal type, amount, status, student name, or email"
+                    : "Search by date, month, bill type, meal type, amount, or status"
+                }
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <button className="btn btnBlue billingRefreshBtn" onClick={loadBills}>
+              Refresh
+            </button>
+          </div>
+
+          <div className="billingSection">
+            <div className="billingSectionHeader">
+              <h2>Unpaid Bills</h2>
+              <span className="badge">{unpaidBills.length}</span>
+            </div>
+
             <div className="tableWrap">
-              <table className="table">
+              <table className="billingTable">
                 <thead>
                   <tr>
-                    <th>User</th>
+                    {isAdminOrStaff && <th>Student</th>}
+                    {isAdminOrStaff && <th>Email</th>}
                     <th>Period</th>
-                    <th>Type</th>
+                    <th>Bill Type</th>
                     <th>Meal</th>
                     <th>Amount</th>
                     <th>Status</th>
-                    <th>Meals</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {unpaidBills.length === 0 ? (
+                    <tr>
+                      <td colSpan={isAdminOrStaff ? 8 : 6} className="billingEmptyCell">
+                        No unpaid bills found
+                      </td>
+                    </tr>
+                  ) : (
+                    unpaidBills.map((bill) => (
+                      <tr key={bill.id}>
+                        {isAdminOrStaff && <td>{bill.user_name || "-"}</td>}
+                        {isAdminOrStaff && <td>{bill.user_email || "-"}</td>}
+                        <td>{formatPeriod(bill.period, bill.bill_type)}</td>
+                        <td>{bill.bill_type === "monthly" ? "Monthly" : "Daily"}</td>
+                        <td>{bill.meal_type || "-"}</td>
+                        <td>{formatMoney(bill.amount)}</td>
+                        <td>
+                          <span className="billingTableBadge billingStatusUnpaid">
+                            {bill.status}
+                          </span>
+                        </td>
+                        <td>
+                          {bill.can_pay ? (
+                            <button className="btn btnBlue billingSmallBtn" onClick={() => openPayModal(bill)}>
+                              Pay (UPI)
+                            </button>
+                          ) : (
+                            <span className="muted">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="billingSection">
+            <div className="billingSectionHeader">
+              <h2>Paid Bills</h2>
+              <span className="badge">{paidBills.length}</span>
+            </div>
+
+            <div className="tableWrap">
+              <table className="billingTable">
+                <thead>
+                  <tr>
+                    {isAdminOrStaff && <th>Student</th>}
+                    {isAdminOrStaff && <th>Email</th>}
+                    <th>Period</th>
+                    <th>Bill Type</th>
+                    <th>Meal</th>
+                    <th>Amount</th>
+                    <th>Status</th>
                     <th>Proof</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAllBills.map((b) => (
-                    <tr key={b.id}>
-                      <td>
-                        {b.user_name}
-                        <br />
-                        <span className="muted">{b.user_email}</span>
+                  {paidBills.length === 0 ? (
+                    <tr>
+                      <td colSpan={isAdminOrStaff ? 8 : 6} className="billingEmptyCell">
+                        No paid bills found
                       </td>
-                      <td>{b.period}</td>
-                      <td>{b.bill_type}</td>
-                      <td>{b.meal_type || "-"}</td>
-                      <td>₹{b.amount}</td>
-                      <td>{b.status}</td>
-                      <td>{b.included_meals_count || 0}</td>
-                      <td>{renderProofCell(b)}</td>
                     </tr>
-                  ))}
+                  ) : (
+                    paidBills.map((bill) => (
+                      <tr key={bill.id}>
+                        {isAdminOrStaff && <td>{bill.user_name || "-"}</td>}
+                        {isAdminOrStaff && <td>{bill.user_email || "-"}</td>}
+                        <td>{formatPeriod(bill.period, bill.bill_type)}</td>
+                        <td>{bill.bill_type === "monthly" ? "Monthly" : "Daily"}</td>
+                        <td>{bill.meal_type || "-"}</td>
+                        <td>{formatMoney(bill.amount)}</td>
+                        <td>
+                          <span className="billingTableBadge billingStatusPaid">
+                            {bill.status}
+                          </span>
+                        </td>
+                        <td>
+                          {bill.payment?.proof_url ? (
+                            <a
+                              href={bill.payment.proof_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="billingProofLink"
+                            >
+                              View Proof
+                            </a>
+                          ) : (
+                            <span className="muted">No Proof</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
-          )}
+          </div>
         </div>
-      )}
+      </div>
 
-      {showQrModal && (
-        <div className="modalOverlay" onClick={closeQrModal}>
-          <div className="modalCard" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ marginBottom: 10 }}>UPI Payment</h2>
-            <p className="muted" style={{ marginBottom: 10 }}>
-              Amount to pay: ₹{selectedBillAmount}
-            </p>
+      {showQrModal && selectedBill && (
+        <div className="qrModalOverlay" onClick={closePayModal}>
+          <div className="qrModalCard billingQrModalCard" onClick={(e) => e.stopPropagation()}>
+            <div className="billingQrLayout">
+              <div className="billingQrLeft">
+                <h2 className="qrTitle">UPI Payment</h2>
+                <p className="qrAmountText">Amount to pay: {formatMoney(selectedBill.amount)}</p>
 
-            <img
-              src={upiQr}
-              alt="UPI QR"
-              style={{
-                width: 220,
-                maxWidth: "100%",
-                borderRadius: 12,
-                marginBottom: 14,
-              }}
-            />
+                <div className="qrPreviewCard">
+                  <img
+                    className="qrImage qrImageSmall"
+                    src={buildQrUrl(selectedBill)}
+                    alt="UPI QR"
+                  />
 
-            <textarea
-              className="input"
-              rows="3"
-              placeholder="Add note (optional)"
-              value={paymentNote}
-              onChange={(e) => setPaymentNote(e.target.value)}
-            />
+                  <div className="qrInfoText">
+                    <p><strong>{UPI_NAME}</strong></p>
+                    <p>UPI ID: {UPI_ID}</p>
+                    <p className="muted">
+                      Scan this QR and the exact amount will be filled automatically.
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-            <input
-              className="input"
-              type="file"
-              accept="image/*"
-              onChange={(e) => setPaymentProof(e.target.files?.[0] || null)}
-            />
+              <div className="billingQrRight">
+                <div className="qrFormSection">
+                  <label className="muted">Add note (optional)</label>
+                  <textarea
+                    className="input"
+                    placeholder="Add note (optional)"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                  />
+                </div>
 
-            <div className="row" style={{ marginTop: 10 }}>
-              <button className="btn btnBlue" onClick={markBillPaid}>
-                I Have Paid
-              </button>
-              <button className="btn btnRed" onClick={closeQrModal}>
-                Close
-              </button>
+                <div className="qrFormSection">
+                  <label className="muted">Upload payment proof</label>
+                  <input
+                    className="input billingFileInput"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setProof(e.target.files?.[0] || null)}
+                  />
+                </div>
+
+                <div className="row qrButtonRow billingQrButtonRow">
+                  <button className="btn btnBlue" disabled={paying} onClick={submitPayment}>
+                    I Have Paid
+                  </button>
+                  <button className="btn btnRed" onClick={closePayModal}>
+                    Close
+                  </button>
+                </div>
+
+                <div className="upiLinkBox">
+                  <label className="muted">UPI Link</label>
+                  <textarea
+                    className="input"
+                    readOnly
+                    value={buildUpiLink(selectedBill)}
+                  />
+                </div>
+              </div>
             </div>
-
-            {paymentSuccess && (
-              <div className="badge" style={{ marginTop: 12 }}>
-                {paymentSuccessMessage}
-              </div>
-            )}
-
-            {receiptData && (
-              <div className="card" style={{ marginTop: 12 }}>
-                <h3 style={{ marginBottom: 8 }}>Receipt Ready</h3>
-                <p className="muted" style={{ marginBottom: 8 }}>
-                  Receipt No: {receiptData.receipt_no}
-                  <br />
-                  Bill Type: {receiptData.bill_type}
-                  <br />
-                  Period: {receiptData.period}
-                  <br />
-                  Amount: ₹{receiptData.amount}
-                </p>
-
-                {receiptData.proof_url && (
-                  <a
-                    href={receiptData.proof_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ textDecoration: "none", display: "inline-block", marginBottom: 10 }}
-                  >
-                    <img
-                      src={receiptData.proof_url}
-                      alt="Receipt Proof"
-                      style={{
-                        width: 110,
-                        height: 110,
-                        objectFit: "cover",
-                        borderRadius: 12,
-                        border: "1px solid rgba(0,0,0,0.12)",
-                        boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-                        background: "#fff",
-                      }}
-                    />
-                  </a>
-                )}
-
-                <button className="btn btnBlue" onClick={() => downloadReceipt(receiptData)}>
-                  Download Receipt
-                </button>
-              </div>
-            )}
           </div>
         </div>
       )}
