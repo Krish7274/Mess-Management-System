@@ -1199,6 +1199,7 @@ def attendance_list():
 
     q = Attendance.query
 
+    # Users can only see their own attendance
     if role not in ["Admin", "Staff"]:
         q = q.filter_by(user_id=uid)
 
@@ -1223,17 +1224,20 @@ def attendance_list():
             "status": a.status
         }
         for a in items
-    ])
+    ]), 200
 
 
 @api.post("/attendance")
 @jwt_required()
 def mark_attendance():
     try:
-        data = request.get_json() or {}
-
         role = get_jwt().get("role")
-        logged_in_uid = int(get_jwt_identity())
+
+        # Only Admin / Staff can mark attendance
+        if role not in ["Admin", "Staff"]:
+            return jsonify({"error": "Only Admin or Staff can mark attendance"}), 403
+
+        data = request.get_json() or {}
 
         date = normalize_to_iso_date(data.get("date"))
         meal_type = (data.get("meal_type") or "").strip()
@@ -1248,13 +1252,17 @@ def mark_attendance():
         if status not in ["Taken", "Skipped"]:
             return jsonify({"error": "status must be Taken/Skipped"}), 400
 
-        target_user_id = logged_in_uid
+        if data.get("user_id") is None:
+            return jsonify({"error": "user_id is required"}), 400
 
-        if role in ["Admin", "Staff"] and data.get("user_id") is not None:
-            try:
-                target_user_id = int(data.get("user_id"))
-            except Exception:
-                return jsonify({"error": "user_id must be a number"}), 400
+        try:
+            target_user_id = int(data.get("user_id"))
+        except Exception:
+            return jsonify({"error": "user_id must be a number"}), 400
+
+        target_user = User.query.get(target_user_id)
+        if not target_user:
+            return jsonify({"error": "Selected user not found"}), 404
 
         existing = Attendance.query.filter_by(
             user_id=target_user_id,
