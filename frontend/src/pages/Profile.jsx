@@ -8,6 +8,7 @@ export default function Profile() {
     contact: "",
     room_no: "",
   });
+
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -20,6 +21,7 @@ export default function Profile() {
     try {
       setError("");
       const res = await api.get("/users/me");
+
       setForm({
         name: res.data.name || "",
         email: res.data.email || "",
@@ -31,6 +33,14 @@ export default function Profile() {
     }
   }
 
+  function handleChange(e) {
+    const { name, value } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  }
+
   async function save() {
     try {
       setSaving(true);
@@ -38,16 +48,15 @@ export default function Profile() {
       setError("");
 
       const payload = {
-        name: form.name,
-        contact: form.contact,
-        room_no: form.room_no,
+        name: form.name.trim(),
+        contact: form.contact.trim(),
+        room_no: form.room_no.trim(),
       };
 
       const res = await api.put("/users/me", payload);
-
       const updatedUser = res.data.user;
 
-      localStorage.setItem("user_name", updatedUser.name);
+      localStorage.setItem("user_name", updatedUser.name || "");
       localStorage.setItem("user", JSON.stringify(updatedUser));
 
       setForm((prev) => ({
@@ -66,43 +75,83 @@ export default function Profile() {
   }
 
   return (
-    <div className="card">
-      <h2>Profile</h2>
+    <div className="profilePageWrap">
+      <div className="profileCompactCard">
+        <div className="profileCompactHeader">
+          <div>
+            <h2 className="profileCompactTitle">My Profile</h2>
+            <p className="profileCompactSubtitle">
+              Manage your personal details in a clean and compact view.
+            </p>
+          </div>
 
-      {msg && <div className="badge">{msg}</div>}
-      {error && <div className="badge" style={{ background: "#ef4444" }}>{error}</div>}
+          <div className="profileAvatarMini">
+            {(form.name || "U").charAt(0).toUpperCase()}
+          </div>
+        </div>
 
-      <label className="muted">Name</label>
-      <input
-        className="input"
-        value={form.name}
-        onChange={(e) => setForm({ ...form, name: e.target.value })}
-      />
+        {msg && <div className="profileAlert profileAlertSuccess">{msg}</div>}
+        {error && <div className="profileAlert profileAlertError">{error}</div>}
 
-      <label className="muted">Email</label>
-      <input
-        className="input"
-        value={form.email}
-        disabled
-      />
+        <div className="profileCompactGrid">
+          <div className="profileField">
+            <label className="profileLabel">Name</label>
+            <input
+              type="text"
+              name="name"
+              className="profileInputCompact"
+              value={form.name}
+              onChange={handleChange}
+              placeholder="Enter your name"
+            />
+          </div>
 
-      <label className="muted">Contact</label>
-      <input
-        className="input"
-        value={form.contact}
-        onChange={(e) => setForm({ ...form, contact: e.target.value })}
-      />
+          <div className="profileField">
+            <label className="profileLabel">Email</label>
+            <input
+              type="email"
+              name="email"
+              className="profileInputCompact profileInputDisabled"
+              value={form.email}
+              disabled
+            />
+          </div>
 
-      <label className="muted">Room No</label>
-      <input
-        className="input"
-        value={form.room_no}
-        onChange={(e) => setForm({ ...form, room_no: e.target.value })}
-      />
+          <div className="profileField">
+            <label className="profileLabel">Contact</label>
+            <input
+              type="text"
+              name="contact"
+              className="profileInputCompact"
+              value={form.contact}
+              onChange={handleChange}
+              placeholder="Enter contact number"
+            />
+          </div>
 
-      <button className="btn btnBlue" onClick={save} disabled={saving}>
-        {saving ? "Saving..." : "Save"}
-      </button>
+          <div className="profileField">
+            <label className="profileLabel">Room No</label>
+            <input
+              type="text"
+              name="room_no"
+              className="profileInputCompact"
+              value={form.room_no}
+              onChange={handleChange}
+              placeholder="Enter room number"
+            />
+          </div>
+        </div>
+
+        <div className="profileCompactActions">
+          <button
+            className="btn btnBlue profileSaveBtnCompact"
+            onClick={save}
+            disabled={saving}
+          >
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -2931,3 +2931,219 @@ hr{
     font-size:13px;
   }
 }
+
+/* ===== PROFILE PAGE - COMPACT MODERN CARD ===== */
+
+.profilePageWrap{
+  width:100%;
+  display:flex;
+  justify-content:center;
+  align-items:flex-start;
+  padding:8px 0 4px;
+}
+
+.profileCompactCard{
+  width:100%;
+  max-width:760px;
+  background:
+    linear-gradient(135deg, rgba(20,27,23,0.95), rgba(11,16,13,0.96));
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:24px;
+  padding:22px;
+  box-shadow:0 18px 40px rgba(0,0,0,0.30);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  position:relative;
+  overflow:hidden;
+}
+
+.profileCompactCard::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(circle at top left, rgba(34,197,94,0.10), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(56,189,248,0.08), transparent 24%);
+  pointer-events:none;
+}
+
+.profileCompactHeader{
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:18px;
+}
+
+.profileCompactTitle{
+  margin:0;
+  font-size:28px;
+  font-weight:900;
+  color:#f8fafc;
+  letter-spacing:0.2px;
+}
+
+.profileCompactSubtitle{
+  margin:6px 0 0;
+  color:#9fb0a5;
+  font-size:14px;
+  line-height:1.5;
+}
+
+.profileAvatarMini{
+  width:54px;
+  height:54px;
+  min-width:54px;
+  border-radius:16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:22px;
+  font-weight:900;
+  color:#041108;
+  background:linear-gradient(135deg, #4ade80, #38bdf8);
+  box-shadow:0 12px 24px rgba(34,197,94,0.18);
+}
+
+.profileAlert{
+  position:relative;
+  z-index:1;
+  margin-bottom:14px;
+  padding:10px 14px;
+  border-radius:14px;
+  font-size:13px;
+  font-weight:800;
+  line-height:1.5;
+}
+
+.profileAlertSuccess{
+  background:rgba(34,197,94,0.12);
+  border:1px solid rgba(34,197,94,0.22);
+  color:#dcfce7;
+}
+
+.profileAlertError{
+  background:rgba(239,68,68,0.10);
+  border:1px solid rgba(239,68,68,0.20);
+  color:#fecaca;
+}
+
+.profileCompactGrid{
+  position:relative;
+  z-index:1;
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:14px;
+}
+
+.profileField{
+  display:flex;
+  flex-direction:column;
+}
+
+.profileLabel{
+  margin-bottom:7px;
+  font-size:13px;
+  font-weight:800;
+  color:#cbd5e1;
+  letter-spacing:0.2px;
+}
+
+.profileInputCompact{
+  width:100%;
+  height:46px;
+  padding:0 14px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,0.08);
+  background:linear-gradient(180deg, rgba(8,12,10,0.96), rgba(12,17,14,0.96));
+  color:#f8fafc;
+  outline:none;
+  font-size:14px;
+  transition:all .22s ease;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.02);
+}
+
+.profileInputCompact::placeholder{
+  color:#708076;
+}
+
+.profileInputCompact:focus{
+  border-color:rgba(56,189,248,0.65);
+  box-shadow:
+    0 0 0 4px rgba(56,189,248,0.10),
+    0 10px 22px rgba(0,0,0,0.16);
+  transform:translateY(-1px);
+}
+
+.profileInputDisabled{
+  opacity:0.72;
+  cursor:not-allowed;
+  background:linear-gradient(180deg, rgba(15,20,18,0.96), rgba(12,17,14,0.96));
+  color:#b7c0ba;
+}
+
+.profileCompactActions{
+  position:relative;
+  z-index:1;
+  display:flex;
+  justify-content:flex-start;
+  margin-top:18px;
+}
+
+.profileSaveBtnCompact{
+  min-width:160px;
+  height:46px;
+  border-radius:14px;
+  font-size:14px;
+  padding:0 18px;
+}
+
+@media (max-width: 768px){
+  .profileCompactCard{
+    max-width:100%;
+    padding:18px;
+    border-radius:20px;
+  }
+
+  .profileCompactHeader{
+    align-items:flex-start;
+  }
+
+  .profileCompactTitle{
+    font-size:24px;
+  }
+
+  .profileCompactGrid{
+    grid-template-columns:1fr;
+    gap:12px;
+  }
+
+  .profileAvatarMini{
+    width:48px;
+    height:48px;
+    min-width:48px;
+    font-size:20px;
+    border-radius:14px;
+  }
+}
+
+@media (max-width: 600px){
+  .profilePageWrap{
+    padding:0;
+  }
+
+  .profileCompactCard{
+    padding:16px;
+  }
+
+  .profileCompactHeader{
+    flex-direction:column;
+    align-items:flex-start;
+  }
+
+  .profileSaveBtnCompact{
+    width:100%;
+  }
+}
