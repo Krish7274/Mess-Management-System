@@ -1,0 +1,19 @@
+# ENV FILES
+.env
+*/.env
+
+# NODE
+node_modules/
+
+# PYTHON
+__pycache__/
+*.pyc
+
+# DATABASE
+instance/
+
+# UPLOADS (optional)
+uploads/
+
+# VENV
+venv/
