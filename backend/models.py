@@ -61,6 +61,18 @@ class Attendance(db.Model):
     status = db.Column(db.String(20), nullable=False)
 
 
+
+
+class MealPlan(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.String(20), nullable=False)
+    breakfast = db.Column(db.Boolean, default=False)
+    lunch = db.Column(db.Boolean, default=False)
+    dinner = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 class Bill(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, nullable=False)

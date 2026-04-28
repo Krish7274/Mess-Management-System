@@ -31,7 +31,24 @@ export default function Sidebar() {
     <header className="topbar">
       <div className="topbarLeft">
         <div className="brandBlock">
-          <div className="brandTitle">🍽️ MESS</div>
+          <div className="brandRow">
+            <div className="brandTitleWrap">
+              <span className="appMiniLogo">🍽️</span>
+              <span className="brandTitle">MESS</span>
+            </div>
+
+            <div className="companyLogoWrap">
+              <img
+                src="/skytus-logo.png"
+                alt="Skytus Logo"
+                className="companyLogo"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            </div>
+          </div>
+
           <div className="brandSubtext">
             {userName} ({userRole})
           </div>

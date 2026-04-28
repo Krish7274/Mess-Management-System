@@ -10,7 +10,6 @@ from models import db, User
 from routes import api
 
 
-
 def create_app():
     load_dotenv()
 
@@ -19,13 +18,23 @@ def create_app():
 
     upload_folder = os.path.join(os.getcwd(), "uploads")
     os.makedirs(upload_folder, exist_ok=True)
+
     app.config["UPLOAD_FOLDER"] = upload_folder
     app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 
     CORS(
         app,
-        resources={r"/*": {"origins": "*"}},
-        supports_credentials=False
+        resources={
+            r"/api/*": {
+                "origins": [
+                    "http://localhost:5173",
+                    "http://127.0.0.1:5173",
+                ],
+                "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+                "allow_headers": ["Content-Type", "Authorization"],
+                "supports_credentials": True,
+            }
+        },
     )
 
     db.init_app(app)
@@ -44,9 +53,53 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+        fix_inventory_columns()
         seed_admin()
 
     return app
+
+
+def fix_inventory_columns():
+    try:
+        engine_name = db.engine.url.get_backend_name()
+
+        if engine_name == "sqlite":
+            result = db.session.execute(db.text("PRAGMA table_info(inventory)"))
+            existing_columns = [row[1] for row in result.fetchall()]
+
+            if "price_per_unit" not in existing_columns:
+                db.session.execute(
+                    db.text("ALTER TABLE inventory ADD COLUMN price_per_unit FLOAT DEFAULT 0")
+                )
+
+            if "updated_at" not in existing_columns:
+                db.session.execute(
+                    db.text("ALTER TABLE inventory ADD COLUMN updated_at DATETIME")
+                )
+
+            db.session.commit()
+
+        else:
+            result = db.session.execute(db.text("SHOW COLUMNS FROM inventory"))
+            existing_columns = [row[0] for row in result.fetchall()]
+
+            if "price_per_unit" not in existing_columns:
+                db.session.execute(
+                    db.text("ALTER TABLE inventory ADD COLUMN price_per_unit FLOAT DEFAULT 0")
+                )
+
+            if "updated_at" not in existing_columns:
+                db.session.execute(
+                    db.text("ALTER TABLE inventory ADD COLUMN updated_at DATETIME NULL")
+                )
+
+            db.session.commit()
+
+        print("✅ Inventory columns checked successfully")
+
+    except Exception as e:
+        db.session.rollback()
+        print("❌ Inventory column fix failed:", e)
 
 
 def seed_admin():
@@ -56,7 +109,7 @@ def seed_admin():
             email="admin@mess.com",
             role="Admin",
             contact="9999999999",
-            room_no="A-101"
+            room_no="A-101",
         )
         admin.set_password("Admin@123")
         db.session.add(admin)

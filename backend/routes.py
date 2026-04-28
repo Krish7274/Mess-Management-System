@@ -25,8 +25,14 @@ from models import (
     Complaint,
     HelpTicket,
     HelpMessage,
+    MealPlan,
 )
-from utils.email_service import send_bill_email, send_otp_email, send_user_welcome_email
+from utils.email_service import (
+    send_bill_email,
+    send_otp_email,
+    send_user_welcome_email,
+    send_meal_confirmation_email,
+)
 
 api = Blueprint("api", __name__)
 
@@ -704,6 +710,7 @@ def delete_user(user_id):
 
         Bill.query.filter_by(user_id=user.id).delete(synchronize_session=False)
         Attendance.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+        MealPlan.query.filter_by(user_id=user.id).delete(synchronize_session=False)
         Complaint.query.filter_by(user_id=user.id).delete(synchronize_session=False)
         Notification.query.filter_by(user_id=user.id).delete(synchronize_session=False)
         EmailOTP.query.filter_by(email=user.email).delete(synchronize_session=False)
@@ -1303,6 +1310,192 @@ def mark_attendance():
         print("ATTENDANCE ERROR:", e)
         return jsonify({"error": "Failed to save attendance"}), 500
 
+def formatDateForMail(date_str):
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d").strftime("%d/%m/%Y")
+    except Exception:
+        return date_str
+
+
+def get_meal_plan_price_summary(plan_date, breakfast, lunch, dinner):
+    selected_meals = []
+    total_amount = 0
+
+    requested_meals = []
+
+    if breakfast:
+        requested_meals.append("Breakfast")
+    if lunch:
+        requested_meals.append("Lunch")
+    if dinner:
+        requested_meals.append("Dinner")
+
+    for meal in requested_meals:
+        price, error = get_meal_price_from_weekly_menu(plan_date, meal)
+
+        if error:
+            price = 0
+
+        selected_meals.append({
+            "name": meal,
+            "price": round(float(price or 0), 2)
+        })
+
+        total_amount += float(price or 0)
+
+    return selected_meals, round(total_amount, 2)
+
+def serialize_meal_plan(plan, include_user=False):
+    user = User.query.get(plan.user_id) if include_user else None
+    return {
+        "id": plan.id,
+        "user_id": plan.user_id,
+        "user_name": user.name if user else None,
+        "email": user.email if user else None,
+        "date": plan.date,
+        "breakfast": bool(plan.breakfast),
+        "lunch": bool(plan.lunch),
+        "dinner": bool(plan.dinner),
+        "created_at": plan.created_at.isoformat() if plan.created_at else None,
+        "updated_at": plan.updated_at.isoformat() if plan.updated_at else None,
+    }
+
+
+@api.get("/meal-plans/my")
+@jwt_required()
+def get_my_meal_plan():
+    try:
+        uid = int(get_jwt_identity())
+        date = normalize_to_iso_date(
+            request.args.get("date") or datetime.utcnow().strftime("%Y-%m-%d")
+        )
+
+        plan = MealPlan.query.filter_by(user_id=uid, date=date).first()
+        if not plan:
+            return jsonify({
+                "date": date,
+                "breakfast": False,
+                "lunch": False,
+                "dinner": False,
+            }), 200
+
+        return jsonify(serialize_meal_plan(plan)), 200
+
+    except Exception as e:
+        print("GET MY MEAL PLAN ERROR:", e)
+        return jsonify({"error": "Failed to load meal plan"}), 500
+
+
+@api.get("/meal-plans")
+@jwt_required()
+def get_all_meal_plans():
+    if not require_roles("Admin", "Staff")():
+        return jsonify({"error": "Forbidden"}), 403
+
+    try:
+        date = normalize_to_iso_date(
+            request.args.get("date") or datetime.utcnow().strftime("%Y-%m-%d")
+        )
+        plans = MealPlan.query.filter_by(date=date).order_by(MealPlan.id.desc()).all()
+        return jsonify([serialize_meal_plan(p, include_user=True) for p in plans]), 200
+
+    except Exception as e:
+        print("GET ALL MEAL PLANS ERROR:", e)
+        return jsonify({"error": "Failed to load meal confirmations"}), 500
+
+
+@api.post("/meal-plans")
+@jwt_required()
+def save_meal_plan():
+    try:
+        uid = int(get_jwt_identity())
+        user = User.query.get_or_404(uid)
+
+        data = request.get_json() or {}
+
+        plan_date = normalize_to_iso_date(data.get("date"))
+        breakfast = bool(data.get("breakfast"))
+        lunch = bool(data.get("lunch"))
+        dinner = bool(data.get("dinner"))
+
+        existing = MealPlan.query.filter_by(
+            user_id=user.id,
+            date=plan_date
+        ).first()
+
+        if existing:
+            existing.breakfast = breakfast
+            existing.lunch = lunch
+            existing.dinner = dinner
+            existing.updated_at = datetime.utcnow()
+            meal_plan = existing
+        else:
+            meal_plan = MealPlan(
+                user_id=user.id,
+                date=plan_date,
+                breakfast=breakfast,
+                lunch=lunch,
+                dinner=dinner
+            )
+            db.session.add(meal_plan)
+            db.session.flush()
+
+        selected_meals, total_amount = get_meal_plan_price_summary(
+            plan_date,
+            breakfast,
+            lunch,
+            dinner
+        )
+
+        db.session.add(Notification(
+            user_id=user.id,
+            title="Meal Confirmation Saved",
+            message=f"Your meal confirmation for {formatDateForMail(plan_date)} has been saved. Estimated amount: ₹{total_amount}"
+        ))
+
+        email_sent = False
+        email_error = None
+
+        if user.email:
+            try:
+                send_meal_confirmation_email(
+                    user.email,
+                    user.name,
+                    formatDateForMail(plan_date),
+                    selected_meals,
+                    total_amount
+                )
+                email_sent = True
+            except Exception as mail_error:
+                email_error = str(mail_error)
+                print("MEAL CONFIRMATION EMAIL ERROR:", mail_error)
+
+        db.session.commit()
+
+        return jsonify({
+            "message": f"Meal plan for {formatDateForMail(plan_date)} saved successfully. Estimated amount: ₹{total_amount}",
+            "email_sent": email_sent,
+            "email_error": email_error,
+            "meal_plan": {
+                "id": meal_plan.id,
+                "user_id": meal_plan.user_id,
+                "date": meal_plan.date,
+                "breakfast": meal_plan.breakfast,
+                "lunch": meal_plan.lunch,
+                "dinner": meal_plan.dinner,
+                "selected_meals": selected_meals,
+                "total_amount": total_amount
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print("SAVE MEAL PLAN ERROR:", e)
+        return jsonify({"error": "Failed to save meal confirmation"}), 500
+
+# =========================
+# INVENTORY HELPER FUNCTIONS
+# =========================
 
 def inventory_status(item):
     qty = float(item.qty or 0)
@@ -1310,8 +1503,10 @@ def inventory_status(item):
 
     if qty <= 0:
         return "Out of Stock"
+
     if qty <= low_limit:
         return "Low Stock"
+
     return "In Stock"
 
 
@@ -1332,7 +1527,6 @@ def serialize_inventory(item):
         "low": qty > 0 and qty <= float(item.low_limit or 0),
         "updated_at": item.updated_at.isoformat() if item.updated_at else None
     }
-
 
 @api.get("/inventory")
 @jwt_required()

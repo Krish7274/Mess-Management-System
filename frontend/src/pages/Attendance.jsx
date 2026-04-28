@@ -3,12 +3,21 @@ import { useNavigate } from "react-router-dom";
 import api from "../api";
 import { getUser } from "../auth";
 
-function todayYYYYMMDD() {
-  const d = new Date();
+function toYYYYMMDD(d) {
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function todayYYYYMMDD() {
+  return toYYYYMMDD(new Date());
+}
+
+function tomorrowYYYYMMDD() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return toYYYYMMDD(d);
 }
 
 function getDayName(dateStr) {
@@ -23,6 +32,31 @@ function formatDate(dateStr) {
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString("en-GB");
+}
+
+const MEALS = ["Breakfast", "Lunch", "Dinner"];
+const PLAN_STORAGE_KEY = "messmate_next_day_meal_plans";
+
+function readLocalPlans() {
+  try {
+    return JSON.parse(localStorage.getItem(PLAN_STORAGE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalPlan(plan) {
+  const list = readLocalPlans();
+  const filtered = list.filter(
+    (p) => !(Number(p.user_id) === Number(plan.user_id) && p.date === plan.date)
+  );
+  const updated = [...filtered, plan];
+  localStorage.setItem(PLAN_STORAGE_KEY, JSON.stringify(updated));
+  return updated;
+}
+
+function emptyMealPlan() {
+  return { Breakfast: false, Lunch: false, Dinner: false };
 }
 
 export default function Attendance() {
@@ -41,6 +75,14 @@ export default function Attendance() {
   const [billingInfo, setBillingInfo] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
+  const [planDate, setPlanDate] = useState(tomorrowYYYYMMDD());
+  const [myMealPlan, setMyMealPlan] = useState(emptyMealPlan());
+  const [planMsg, setPlanMsg] = useState("");
+  const [planErr, setPlanErr] = useState("");
+  const [planLoading, setPlanLoading] = useState(false);
+  const [adminPlans, setAdminPlans] = useState([]);
+  const [adminPlanDate, setAdminPlanDate] = useState(tomorrowYYYYMMDD());
+
   useEffect(() => {
     if (!isAdminOrStaff) return;
 
@@ -58,11 +100,14 @@ export default function Attendance() {
 
   async function loadRecords() {
     setErr("");
+
     try {
       let url = "/attendance";
 
       if (isAdminOrStaff) {
-        url = `/attendance?date=${encodeURIComponent(date)}&meal_type=${encodeURIComponent(mealType)}`;
+        url = `/attendance?date=${encodeURIComponent(
+          date
+        )}&meal_type=${encodeURIComponent(mealType)}`;
       }
 
       const res = await api.get(url);
@@ -106,6 +151,122 @@ export default function Attendance() {
     }
   }
 
+  async function loadMyMealPlan() {
+    if (isAdminOrStaff || !user?.id) return;
+
+    setPlanErr("");
+
+    try {
+      const res = await api.get(`/meal-plans/my?date=${encodeURIComponent(planDate)}`);
+      const plan = res.data || {};
+
+      setMyMealPlan({
+        Breakfast: Boolean(plan.breakfast),
+        Lunch: Boolean(plan.lunch),
+        Dinner: Boolean(plan.dinner),
+      });
+    } catch {
+      const local = readLocalPlans().find(
+        (p) => Number(p.user_id) === Number(user.id) && p.date === planDate
+      );
+
+      setMyMealPlan(
+        local
+          ? {
+              Breakfast: !!local.breakfast,
+              Lunch: !!local.lunch,
+              Dinner: !!local.dinner,
+            }
+          : emptyMealPlan()
+      );
+    }
+  }
+
+  useEffect(() => {
+    loadMyMealPlan();
+  }, [planDate, isAdminOrStaff, user?.id]);
+
+  function getPlanSuccessMessage(selectedDateValue) {
+    const today = new Date();
+    const selected = new Date(selectedDateValue);
+
+    const tomorrow = new Date();
+    tomorrow.setDate(today.getDate() + 1);
+
+    if (selected.toDateString() === tomorrow.toDateString()) {
+      return "Tomorrow's meal plan saved successfully.";
+    }
+
+    const formattedDate = selected.toLocaleDateString("en-GB");
+    return `Meal plan for ${formattedDate} saved successfully.`;
+  }
+
+  async function saveMealPlan() {
+    if (!user?.id) return;
+
+    setPlanMsg("");
+    setPlanErr("");
+    setPlanLoading(true);
+
+    const payload = {
+      date: planDate,
+      breakfast: myMealPlan.Breakfast,
+      lunch: myMealPlan.Lunch,
+      dinner: myMealPlan.Dinner,
+    };
+
+    try {
+      const res = await api.post("/meal-plans", payload);
+      setPlanMsg(res.data?.message || getPlanSuccessMessage(planDate));
+    } catch {
+      saveLocalPlan({
+        id: `${user.id}-${planDate}`,
+        user_id: user.id,
+        user_name: user.name || user.full_name || "Me",
+        email: user.email || "",
+        date: planDate,
+        breakfast: payload.breakfast,
+        lunch: payload.lunch,
+        dinner: payload.dinner,
+        created_at: new Date().toISOString(),
+      });
+
+      setPlanMsg(getPlanSuccessMessage(planDate));
+    } finally {
+      setPlanLoading(false);
+    }
+  }
+
+  async function loadAdminMealPlans() {
+    if (!isAdminOrStaff) return;
+
+    setPlanErr("");
+
+    try {
+      const res = await api.get(`/meal-plans?date=${encodeURIComponent(adminPlanDate)}`);
+      setAdminPlans(res.data || []);
+    } catch {
+      const local = readLocalPlans().filter((p) => p.date === adminPlanDate);
+      setAdminPlans(local);
+    }
+  }
+
+  useEffect(() => {
+    loadAdminMealPlans();
+  }, [adminPlanDate, isAdminOrStaff]);
+
+  const mealPlanTotals = useMemo(() => {
+    return adminPlans.reduce(
+      (acc, p) => {
+        if (p.breakfast) acc.Breakfast += 1;
+        if (p.lunch) acc.Lunch += 1;
+        if (p.dinner) acc.Dinner += 1;
+        return acc;
+      },
+      { Breakfast: 0, Lunch: 0, Dinner: 0 }
+    );
+  }, [adminPlans]);
+
   const filteredRecords = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
 
@@ -137,7 +298,7 @@ export default function Attendance() {
   );
 
   function getUserName(userId) {
-    const found = users.find((u) => u.id === userId);
+    const found = users.find((u) => Number(u.id) === Number(userId));
     return found ? found.name : `User ID: ${userId}`;
   }
 
@@ -160,8 +321,8 @@ export default function Attendance() {
               <div className="attendanceBillCard">
                 <h3>Bill Created for This Attendance</h3>
                 <p className="muted">
-                  {billingInfo.period} • {billingInfo.bill_type} • ₹{billingInfo.amount} •{" "}
-                  {billingInfo.status}
+                  {billingInfo.period} • {billingInfo.bill_type} • ₹
+                  {billingInfo.amount} • {billingInfo.status}
                 </p>
                 <div className="row" style={{ marginTop: 10 }}>
                   <button className="btn btnBlue" onClick={() => navigate("/app/billing")}>
@@ -189,9 +350,9 @@ export default function Attendance() {
                   value={mealType}
                   onChange={(e) => setMealType(e.target.value)}
                 >
-                  <option>Breakfast</option>
-                  <option>Lunch</option>
-                  <option>Dinner</option>
+                  {MEALS.map((meal) => (
+                    <option key={meal}>{meal}</option>
+                  ))}
                 </select>
               </div>
 
@@ -227,6 +388,74 @@ export default function Attendance() {
                   Mark Skipped
                 </button>
               </div>
+            </div>
+          </div>
+
+          <div className="card nextMealAdminCard">
+            <div className="attendanceTableTitleRow">
+              <div>
+                <h2>Next Day Meal Confirmation</h2>
+                <p className="muted">
+                  Admin can see how many users will take meals on selected date.
+                </p>
+              </div>
+              <button className="btn btnBlue" onClick={loadAdminMealPlans}>
+                Refresh
+              </button>
+            </div>
+
+            <div className="nextMealTopRow">
+              <div className="attendanceFieldCompact">
+                <label className="muted">Plan Date</label>
+                <input
+                  className="input"
+                  type="date"
+                  value={adminPlanDate}
+                  onChange={(e) => setAdminPlanDate(e.target.value)}
+                />
+              </div>
+
+              <div className="nextMealSummaryGrid">
+                {MEALS.map((meal) => (
+                  <div className="nextMealSummaryBox" key={meal}>
+                    <span>{meal}</span>
+                    <strong>{mealPlanTotals[meal]}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="tableWrap">
+              <table className="attendanceTable">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Email</th>
+                    <th>Breakfast</th>
+                    <th>Lunch</th>
+                    <th>Dinner</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {adminPlans.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="attendanceEmptyCell">
+                        No meal confirmations for this date
+                      </td>
+                    </tr>
+                  ) : (
+                    adminPlans.map((p) => (
+                      <tr key={p.id || `${p.user_id}-${p.date}`}>
+                        <td>{p.user_name || p.name || getUserName(p.user_id)}</td>
+                        <td>{p.email || "-"}</td>
+                        <td>{p.breakfast ? "Yes" : "No"}</td>
+                        <td>{p.lunch ? "Yes" : "No"}</td>
+                        <td>{p.dinner ? "Yes" : "No"}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -312,10 +541,61 @@ export default function Attendance() {
         <div className="card attendanceUserCard">
           <h1>My Attendance</h1>
           <p className="muted" style={{ marginBottom: 16 }}>
-            You can only view your attendance. Only Admin/Staff can mark it.
+            You can view your attendance and confirm tomorrow's meal plan.
           </p>
 
           {err && <div className="status-box status-error">{err}</div>}
+          {planMsg && <div className="status-box status-success">{planMsg}</div>}
+          {planErr && <div className="status-box status-error">{planErr}</div>}
+
+          <div className="card nextMealUserCard">
+            <div className="attendanceTableTitleRow">
+              <div>
+                <h2>Will You Take Meal Tomorrow?</h2>
+                <p className="muted">
+                  Select meals for the next day so admin can plan food quantity.
+                </p>
+              </div>
+            </div>
+
+            <div className="nextMealUserGrid">
+              <div className="attendanceFieldCompact">
+                <label className="muted">Date</label>
+                <input
+                  className="input"
+                  type="date"
+                  value={planDate}
+                  onChange={(e) => setPlanDate(e.target.value)}
+                />
+              </div>
+
+              <div className="nextMealOptions">
+                {MEALS.map((meal) => (
+                  <label className="nextMealOption" key={meal}>
+                    <input
+                      type="checkbox"
+                      checked={myMealPlan[meal]}
+                      onChange={(e) =>
+                        setMyMealPlan((prev) => ({
+                          ...prev,
+                          [meal]: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span>{meal}</span>
+                  </label>
+                ))}
+              </div>
+
+              <button
+                className="btn btnGreen nextMealSaveBtn"
+                disabled={planLoading}
+                onClick={saveMealPlan}
+              >
+                {planLoading ? "Saving..." : "Save Meal Confirmation"}
+              </button>
+            </div>
+          </div>
 
           <div className="attendanceSearchBar">
             <div className="attendanceSearchLeft">
