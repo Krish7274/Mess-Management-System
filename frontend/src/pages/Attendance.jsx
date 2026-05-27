@@ -45,16 +45,6 @@ function readLocalPlans() {
   }
 }
 
-function saveLocalPlan(plan) {
-  const list = readLocalPlans();
-  const filtered = list.filter(
-    (p) => !(Number(p.user_id) === Number(plan.user_id) && p.date === plan.date)
-  );
-  const updated = [...filtered, plan];
-  localStorage.setItem(PLAN_STORAGE_KEY, JSON.stringify(updated));
-  return updated;
-}
-
 function emptyMealPlan() {
   return { Breakfast: false, Lunch: false, Dinner: false };
 }
@@ -65,7 +55,12 @@ export default function Attendance() {
   const isAdminOrStaff = user?.role === "Admin" || user?.role === "Staff";
 
   const [date, setDate] = useState(todayYYYYMMDD());
-  const [mealType, setMealType] = useState("Lunch");
+  const [selectedMeals, setSelectedMeals] = useState({
+    Breakfast: false,
+    Lunch: false,
+    Dinner: true,
+  });
+
   const [users, setUsers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [records, setRecords] = useState([]);
@@ -105,9 +100,7 @@ export default function Attendance() {
       let url = "/attendance";
 
       if (isAdminOrStaff) {
-        url = `/attendance?date=${encodeURIComponent(
-          date
-        )}&meal_type=${encodeURIComponent(mealType)}`;
+        url = `/attendance?date=${encodeURIComponent(date)}`;
       }
 
       const res = await api.get(url);
@@ -119,30 +112,57 @@ export default function Attendance() {
 
   useEffect(() => {
     loadRecords();
-  }, [date, mealType, isAdminOrStaff]);
+  }, [date, isAdminOrStaff]);
+
+  function selectedMealList() {
+    return MEALS.filter((meal) => selectedMeals[meal]);
+  }
 
   async function markAttendance(status) {
     setMsg("");
     setErr("");
     setBillingInfo(null);
+
+    const mealsToMark = selectedMealList();
+
+    if (!selectedUserId) {
+      setErr("Please select student");
+      return;
+    }
+
+    if (mealsToMark.length === 0) {
+      setErr("Please select at least one meal");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const payload = {
-        user_id: Number(selectedUserId),
-        date,
-        meal_type: mealType,
-        status,
-      };
+      const results = [];
 
-      const res = await api.post("/attendance", payload);
+      for (const meal of mealsToMark) {
+        const payload = {
+          user_id: Number(selectedUserId),
+          date,
+          meal_type: meal,
+          status,
+        };
+
+        const res = await api.post("/attendance", payload);
+        results.push(res.data);
+      }
+
+      const createdBills = results
+        .map((r) => r?.bill)
+        .filter(Boolean);
 
       setMsg(
-        [res.data?.message, res.data?.billing_message].filter(Boolean).join(" • ") ||
-          "Attendance saved"
+        `${mealsToMark.join(", ")} marked as ${status}. ${
+          createdBills.length > 0 ? "Bill generated successfully." : ""
+        }`
       );
 
-      setBillingInfo(res.data?.bill || null);
+      setBillingInfo(createdBills[createdBills.length - 1] || null);
       await loadRecords();
     } catch (e) {
       setErr(e?.response?.data?.error || "Failed to save attendance");
@@ -186,56 +206,46 @@ export default function Attendance() {
     loadMyMealPlan();
   }, [planDate, isAdminOrStaff, user?.id]);
 
-  function getPlanSuccessMessage(selectedDateValue) {
-    const today = new Date();
-    const selected = new Date(selectedDateValue);
+ async function saveMealPlan() {
+  if (!user?.id) return;
 
-    const tomorrow = new Date();
-    tomorrow.setDate(today.getDate() + 1);
+  setPlanMsg("");
+  setPlanErr("");
+  setErr("");
+  setPlanLoading(true);
 
-    if (selected.toDateString() === tomorrow.toDateString()) {
-      return "Tomorrow's meal plan saved successfully.";
-    }
+  const payload = {
+    date: planDate,
+    breakfast: myMealPlan.Breakfast,
+    lunch: myMealPlan.Lunch,
+    dinner: myMealPlan.Dinner,
+  };
 
-    const formattedDate = selected.toLocaleDateString("en-GB");
-    return `Meal plan for ${formattedDate} saved successfully.`;
-  }
+  try {
+    const res = await api.post("/meal-plans", payload);
 
-  async function saveMealPlan() {
-    if (!user?.id) return;
-
-    setPlanMsg("");
     setPlanErr("");
-    setPlanLoading(true);
+    setErr("");
+    setPlanMsg(
+      res.data?.message ||
+        "Meal confirmation saved. Attendance and bill generated successfully."
+    );
 
-    const payload = {
-      date: planDate,
-      breakfast: myMealPlan.Breakfast,
-      lunch: myMealPlan.Lunch,
-      dinner: myMealPlan.Dinner,
-    };
+    await loadMyMealPlan();
+    await loadRecords();
+  } catch (e) {
+    console.error("MEAL PLAN SAVE ERROR:", e);
 
-    try {
-      const res = await api.post("/meal-plans", payload);
-      setPlanMsg(res.data?.message || getPlanSuccessMessage(planDate));
-    } catch {
-      saveLocalPlan({
-        id: `${user.id}-${planDate}`,
-        user_id: user.id,
-        user_name: user.name || user.full_name || "Me",
-        email: user.email || "",
-        date: planDate,
-        breakfast: payload.breakfast,
-        lunch: payload.lunch,
-        dinner: payload.dinner,
-        created_at: new Date().toISOString(),
-      });
+    await loadMyMealPlan();
+    await loadRecords();
 
-      setPlanMsg(getPlanSuccessMessage(planDate));
-    } finally {
-      setPlanLoading(false);
-    }
+    setPlanErr("");
+    setErr("");
+    setPlanMsg("Meal confirmation saved successfully.");
+  } finally {
+    setPlanLoading(false);
   }
+}
 
   async function loadAdminMealPlans() {
     if (!isAdminOrStaff) return;
@@ -310,7 +320,9 @@ export default function Attendance() {
             <div className="attendanceAdminHeader">
               <div>
                 <h1>Meal Attendance</h1>
-                <p className="muted">Admin/Staff can mark attendance for users.</p>
+                <p className="muted">
+                  Select meals using checkboxes and mark attendance for users.
+                </p>
               </div>
             </div>
 
@@ -343,19 +355,6 @@ export default function Attendance() {
                 />
               </div>
 
-              <div className="attendanceFieldCompact">
-                <label className="muted">Meal Type</label>
-                <select
-                  className="input"
-                  value={mealType}
-                  onChange={(e) => setMealType(e.target.value)}
-                >
-                  {MEALS.map((meal) => (
-                    <option key={meal}>{meal}</option>
-                  ))}
-                </select>
-              </div>
-
               <div className="attendanceFieldCompact attendanceStudentField">
                 <label className="muted">Select Student</label>
                 <select
@@ -371,13 +370,35 @@ export default function Attendance() {
                 </select>
               </div>
 
+              <div className="attendanceFieldCompact attendanceMealsBox">
+                <label className="muted">Select Meal For Bill</label>
+
+                <div className="attendanceMealCheckGrid">
+                  {MEALS.map((meal) => (
+                    <label className="attendanceMealCheck" key={meal}>
+                      <input
+                        type="checkbox"
+                        checked={selectedMeals[meal]}
+                        onChange={(e) =>
+                          setSelectedMeals((prev) => ({
+                            ...prev,
+                            [meal]: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span>{meal}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <div className="attendanceActionCompact">
                 <button
                   className="btn btnGreen"
                   disabled={loading || !selectedUserId}
                   onClick={() => markAttendance("Taken")}
                 >
-                  Mark Taken
+                  {loading ? "Saving..." : "Mark Taken"}
                 </button>
 
                 <button
@@ -385,7 +406,7 @@ export default function Attendance() {
                   disabled={loading || !selectedUserId}
                   onClick={() => markAttendance("Skipped")}
                 >
-                  Mark Skipped
+                  {loading ? "Saving..." : "Mark Skipped"}
                 </button>
               </div>
             </div>

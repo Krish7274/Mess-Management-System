@@ -72,7 +72,28 @@ export default function Menu() {
     try {
       setWeeklyLoading(true);
       const res = await api.get("/menu/weekly");
-      setWeeklyMenus(Array.isArray(res.data) ? res.data : []);
+      const list = Array.isArray(res.data) ? res.data : [];
+      setWeeklyMenus(list);
+
+      // Use the latest weekly menu as a recurring day-wise template.
+      // Admin/Staff can save it once and the backend applies it to dates by calendar day name.
+      if (!editingWeeklyId && list.length > 0) {
+        const latest = list[0];
+        const next = emptyWeeklyItems();
+
+        DAYS.forEach((day) => {
+          MEALS.forEach((meal) => {
+            next[day][meal] = {
+              items: latest.weekly_items?.[day]?.[meal]?.items || "",
+              price: String(latest.weekly_items?.[day]?.[meal]?.price ?? ""),
+            };
+          });
+        });
+
+        setEditingWeeklyId(latest.id);
+        setWeekStart(latest.week_start || getCurrentWeekStart());
+        setWeeklyItems(next);
+      }
     } catch (e) {
       console.error("Load weekly menu failed", e);
     } finally {
@@ -184,7 +205,9 @@ export default function Menu() {
 
     try {
       const payload = {
-        week_start: weekStart,
+        // Kept for database compatibility. The saved menu is now used as a recurring
+        // Monday-Sunday template, so dates are auto-matched by calendar day name.
+        week_start: weekStart || getCurrentWeekStart(),
         weekly_items: weeklyItems,
       };
 
@@ -199,9 +222,10 @@ export default function Menu() {
             : "Weekly menu saved successfully")
       );
 
-      setEditingWeeklyId(null);
-      setWeekStart(getCurrentWeekStart());
-      setWeeklyItems(emptyWeeklyItems());
+      if (res.data?.menu?.id) {
+        setEditingWeeklyId(res.data.menu.id);
+        setWeekStart(res.data.menu.week_start || getCurrentWeekStart());
+      }
       loadWeeklyMenus();
     } catch (e) {
       console.error("Save weekly menu error", e);
@@ -259,7 +283,7 @@ export default function Menu() {
     if (!q) return weeklyMenus;
 
     return weeklyMenus.filter((menu) => {
-      const weekDates = getWeekDateMap(menu.week_start);
+      const weekDates = getWeekDateMap(getCurrentWeekStart());
 
       const matchDay = DAYS.some((day) => {
         const dayDate = weekDates[day] || "";
@@ -381,8 +405,8 @@ export default function Menu() {
         <div className="card weekly-form-card">
           <div className="menuWeeklyHeader">
             <div>
-              <h2>{editingWeeklyId ? "Edit Weekly Menu" : "Weekly Menu"}</h2>
-              <p className="muted">Compact weekly form with cleaner layout</p>
+              <h2>{editingWeeklyId ? "Edit Weekly Menu Template" : "Weekly Menu Template"}</h2>
+              <p className="muted">Set Monday to Sunday once. It will automatically apply to any date by calendar day name.</p>
             </div>
 
             {editingWeeklyId ? (
@@ -395,13 +419,10 @@ export default function Menu() {
           <form onSubmit={saveWeeklyMenu}>
             <div className="menuWeekStartWrap">
               <div className="menuWeekStartCard">
-                <label className="menuLabel">Week Start Date</label>
-                <input
-                  className="input"
-                  type="date"
-                  value={weekStart}
-                  onChange={(e) => setWeekStart(e.target.value)}
-                />
+                <label className="menuLabel">Recurring Weekly Menu</label>
+                <p className="muted" style={{ margin: 0 }}>
+                  No frequent date changes needed. Select food by day name only; the system uses the real calendar date automatically.
+                </p>
               </div>
             </div>
 
@@ -467,7 +488,7 @@ export default function Menu() {
 
             <div className="weeklyFormActionRow">
               <button className="btn btnBlue" type="submit">
-                {editingWeeklyId ? "Update Weekly Menu" : "Save Weekly Menu"}
+                {editingWeeklyId ? "Update Weekly Template" : "Save Weekly Template"}
               </button>
             </div>
           </form>
@@ -479,10 +500,10 @@ export default function Menu() {
           <div>
             <h2 className="weekly-menu-title">Weekly Menu List</h2>
             <p className="weekly-menu-subtitle">
-              Search by day name, date, item, or price. Example: Monday, 24-03-2026, Lunch
+              Search by day name, current calendar date, item, or price. Example: Monday, Lunch
             </p>
             <span className="weekly-menu-updated">
-              Compact, modern weekly menu view
+              Recurring day-wise weekly menu view
             </span>
           </div>
         </div>
@@ -505,7 +526,7 @@ export default function Menu() {
         ) : (
           <div className="weeklyDisplayWrap">
             {filteredWeeklyMenus.map((menu) => {
-              const weekDates = getWeekDateMap(menu.week_start);
+              const weekDates = getWeekDateMap(getCurrentWeekStart());
 
               const visibleDays = DAYS.filter((day) => {
                 const q = weeklySearch.trim().toLowerCase();
@@ -527,9 +548,9 @@ export default function Menu() {
                 <div key={menu.id} className="weeklyDisplayCard">
                   <div className="weeklyDisplayHeader">
                     <div>
-                      <h3>Week Start: {menu.week_start}</h3>
+                      <h3>Recurring Weekly Menu</h3>
                       <p className="muted">
-                        Updated: {menu.updated_at ? formatDate(menu.updated_at) : "-"}
+                        Updated: {menu.updated_at ? formatDate(menu.updated_at) : "-"} • Applies automatically by day name
                       </p>
                     </div>
 

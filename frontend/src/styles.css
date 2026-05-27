@@ -3354,3 +3354,581 @@ hr{
     grid-template-columns:1fr;
   }
 }
+
+.dashboardPage {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 10px;
+}
+
+/* HERO */
+.dashboardHeroCard,
+.dashboardChartCard,
+.dashboardStatCard {
+  background: linear-gradient(180deg, #111c16, #0d1712) !important;
+  color: #f8fafc !important;
+  border: 1px solid #24362b !important;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.28) !important;
+}
+
+.dashboardHeroCard {
+  border-radius: 24px !important;
+  overflow: hidden;
+  position: relative;
+}
+
+.dashboardHeroCard:before,
+.dashboardStatCard:after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.dashboardHeroCard:before {
+  right: -80px;
+  top: -100px;
+  width: 260px;
+  height: 260px;
+}
+
+.dashboardHeroHeader {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dashboardHeroHeader h2,
+.dashboardChartHead h3 {
+  color: #f8fafc !important;
+}
+
+.dashboardHeroHeader .muted,
+.dashboardChartHead p,
+.dashboardChartHead .muted {
+  color: #b9c7be !important;
+  font-weight: 700;
+}
+
+.dashboardHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dashboardRefreshBtn {
+  background: #1fb65b !important;
+  color: #07110b !important;
+  border: none !important;
+  box-shadow: 0 10px 24px rgba(34, 197, 94, 0.25);
+}
+
+/* STATS */
+.dashboardStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+
+.dashboardStatCard {
+  border-radius: 22px;
+  padding: 22px;
+  position: relative;
+  overflow: hidden;
+  min-height: 120px;
+}
+
+.dashboardStatCard:after {
+  right: -30px;
+  bottom: -35px;
+  width: 105px;
+  height: 105px;
+}
+
+.dashboardStatCard span {
+  display: block;
+  color: #cbd5ce !important;
+  font-size: 14px;
+  font-weight: 900;
+  margin-bottom: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.dashboardStatCard strong {
+  font-size: 38px;
+  color: #f8fafc !important;
+  position: relative;
+  z-index: 1;
+}
+
+.statGreen strong {
+  color: #22c55e !important;
+}
+
+.statRed strong {
+  color: #ef4444 !important;
+}
+
+.statBlue strong {
+  color: #38bdf8 !important;
+}
+
+/* CHARTS */
+.dashboardChartsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+
+.dashboardChartCard {
+  border-radius: 26px !important;
+  padding: 26px !important;
+  min-height: 470px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.dashboardChartHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.dashboardChartHead h3 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.badge {
+  background: #123f26 !important;
+  color: #d9ffe6 !important;
+  border: 1px solid #1e7a43 !important;
+}
+
+/* DONUT */
+.dashboardDonutWrap {
+  width: 290px;
+  height: 290px;
+  margin: 10px auto 20px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboardDonut {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  filter: drop-shadow(0 18px 24px rgba(34, 197, 94, 0.18));
+}
+
+.donutTrack {
+  fill: none;
+  stroke: #203128;
+  stroke-width: 15;
+}
+
+.donutTaken,
+.donutSkipped {
+  fill: none;
+  stroke-width: 15;
+  stroke-linecap: round;
+}
+
+.donutTaken {
+  stroke: #18b958;
+}
+
+.donutSkipped {
+  stroke: #ef4444;
+}
+
+.dashboardDonutCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboardDonutCenter strong {
+  font-size: 46px;
+  color: #22c55e !important;
+}
+
+.dashboardDonutCenter span {
+  font-size: 14px;
+  color: #e5e7eb !important;
+  font-weight: 900;
+}
+
+/* PILLAR */
+.dashboardPillarChart {
+  height: 290px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 70px;
+  margin: 15px auto 22px;
+  padding: 24px 28px 0;
+  background: #0b140f !important;
+  border: 1px solid #263a2e;
+  border-radius: 28px;
+  max-width: 560px;
+  width: 100%;
+}
+
+.pillarItem {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 110px;
+}
+
+.pillarValue {
+  font-size: 26px;
+  font-weight: 900;
+  color: #f8fafc !important;
+}
+
+.pillarBarShell {
+  height: 190px;
+  width: 76px;
+  background: #111c16;
+  border-radius: 999px;
+  display: flex;
+  align-items: flex-end;
+  padding: 7px;
+  border: 1px solid #294534;
+}
+
+.pillarBar {
+  width: 100%;
+  border-radius: 999px;
+  min-height: 10px;
+}
+
+.pillarPaid {
+  background: linear-gradient(180deg, #38bdf8, #2563eb);
+}
+
+.pillarUnpaid {
+  background: linear-gradient(180deg, #fb923c, #f97316);
+}
+
+.pillarItem span {
+  font-weight: 900;
+  color: #d1d5db !important;
+}
+
+/* LEGENDS */
+.dashboardLegend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.dashboardLegend div {
+  background: #0b140f !important;
+  border: 1px solid #263a2e;
+  border-radius: 18px;
+  padding: 14px 16px;
+  color: #e5e7eb !important;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.legendDot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.legendGreen {
+  background: #22c55e;
+}
+
+.legendRed {
+  background: #ef4444;
+}
+
+.legendBlue {
+  background: #2563eb;
+}
+
+.legendOrange {
+  background: #f97316;
+}
+
+@media (max-width: 1100px) {
+  .dashboardStatsGrid,
+  .dashboardChartsGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .dashboardStatsGrid,
+  .dashboardChartsGrid,
+  .dashboardLegend {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboardHeroHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dashboardDonutWrap {
+    width: 230px;
+    height: 230px;
+  }
+
+  .dashboardPillarChart {
+    gap: 34px;
+  }
+
+  .pillarBarShell {
+    width: 60px;
+  }
+}
+.studentDashboardGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+
+.dashboardStudentCard {
+  background: linear-gradient(180deg, #111c16, #0d1712) !important;
+  color: #f8fafc !important;
+  border: 1px solid #24362b !important;
+  border-radius: 26px !important;
+  padding: 26px !important;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.28) !important;
+}
+
+.dashboardStudentCard h3 {
+  color: #f8fafc !important;
+  font-size: 24px;
+  margin-bottom: 18px;
+}
+
+.dashboardMenuDetails {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboardMenuDetails p {
+  margin: 0;
+  padding: 14px 16px;
+  background: #0b140f !important;
+  border: 1px solid #263a2e !important;
+  border-radius: 16px;
+  color: #cbd5ce !important;
+  font-weight: 700;
+}
+
+.dashboardMenuDetails strong {
+  color: #f8fafc !important;
+}
+
+.studentBillChartCard {
+  min-height: 430px;
+}
+
+.studentBillAmountGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.studentBillAmountGrid div {
+  background: #0b140f;
+  border: 1px solid #263a2e;
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.studentBillAmountGrid span {
+  display: block;
+  color: #b9c7be;
+  font-size: 13px;
+  font-weight: 900;
+  margin-bottom: 8px;
+}
+
+.studentBillAmountGrid strong {
+  color: #22c55e;
+  font-size: 22px;
+}
+
+@media (max-width: 900px) {
+  .studentDashboardGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.billingPayTop{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom:16px;
+}
+
+.billingCloseBtn{
+  min-width:90px;
+}
+
+.billingModeSelector{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-bottom:18px;
+}
+
+.billingModeOption{
+  border:1px solid rgba(255,255,255,0.10);
+  background:rgba(255,255,255,0.05);
+  color:#e5e7eb;
+  padding:14px;
+  border-radius:16px;
+  font-weight:900;
+  cursor:pointer;
+  transition:0.2s ease;
+}
+
+.billingModeOption:hover{
+  transform:translateY(-1px);
+  background:rgba(56,189,248,0.12);
+}
+
+.billingModeOption.active{
+  background:linear-gradient(135deg,#38bdf8,#67e8f9);
+  color:#041108;
+  border-color:rgba(103,232,249,0.45);
+}
+
+.billingModeOption.active.cash{
+  background:linear-gradient(135deg,#22c55e,#86efac);
+  color:#041108;
+  border-color:rgba(134,239,172,0.45);
+}
+
+.cashInfoCard{
+  padding:22px;
+  border-radius:20px;
+  background:rgba(34,197,94,0.08);
+  border:1px solid rgba(34,197,94,0.20);
+  text-align:center;
+}
+
+.cashIcon{
+  width:70px;
+  height:70px;
+  margin:0 auto 12px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:linear-gradient(135deg,#22c55e,#86efac);
+  color:#041108;
+  font-size:34px;
+  font-weight:900;
+}
+
+.cashInfoCard h3{
+  margin:6px 0;
+  color:#f8fafc;
+}
+
+.cashInfoCard h2{
+  margin-top:14px;
+  color:#86efac;
+}
+
+.billingModeBadge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:7px 12px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:900;
+  color:#67e8f9;
+  background:rgba(56,189,248,0.12);
+  border:1px solid rgba(56,189,248,0.22);
+}
+
+@media (max-width:600px){
+  .billingModeSelector{
+    grid-template-columns:1fr;
+  }
+
+  .billingPayTop{
+    flex-direction:column;
+  }
+}
+
+.attendanceMealsBox {
+  min-width: 360px;
+}
+
+.attendanceMealCheckGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.attendanceMealCheck {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  color: #f8fafc;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.attendanceMealCheck input {
+  width: 18px;
+  height: 18px;
+  accent-color: #22c55e;
+}
+
+.attendanceMealCheck:has(input:checked) {
+  background: rgba(34, 197, 94, 0.14);
+  border-color: #22c55e;
+}
+
+@media (max-width: 900px) {
+  .attendanceMealsBox {
+    min-width: 100%;
+  }
+
+  .attendanceMealCheckGrid {
+    grid-template-columns: 1fr;
+  }
+}

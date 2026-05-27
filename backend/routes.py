@@ -864,19 +864,44 @@ def get_day_name_from_date(date_str):
     return dt.strftime("%A")
 
 
+def get_active_weekly_menu_for_date(date_str):
+    """
+    First try a menu saved for that exact week.
+    If not found, use the latest saved weekly menu as the recurring template.
+    This means admin/staff can set Monday-Sunday once, and the system will
+    automatically apply the correct day menu to any calendar date.
+    """
+    calendar_week_start = get_week_start_from_date(date_str)
+
+    exact_menu = WeeklyMenu.query.filter_by(week_start=calendar_week_start).first()
+    if exact_menu:
+        return exact_menu, calendar_week_start, False
+
+    latest_menu = WeeklyMenu.query.order_by(
+        WeeklyMenu.updated_at.desc(),
+        WeeklyMenu.id.desc()
+    ).first()
+
+    if latest_menu:
+        return latest_menu, calendar_week_start, True
+
+    return None, calendar_week_start, False
+
+
 def get_today_menu_from_weekly_menu(date_str):
-    week_start = get_week_start_from_date(date_str)
+    weekly_menu, calendar_week_start, used_template = get_active_weekly_menu_for_date(date_str)
     day_name = get_day_name_from_date(date_str)
 
-    weekly_menu = WeeklyMenu.query.filter_by(week_start=week_start).first()
     if not weekly_menu:
-        return None, f"No weekly menu found for week starting {week_start}"
+        return None, "No weekly menu template found. Please add weekly menu once."
 
     weekly_items = weekly_menu.weekly_items or {}
     day_block = weekly_items.get(day_name, {}) or {}
 
     return {
-        "week_start": week_start,
+        "week_start": calendar_week_start,
+        "template_week_start": weekly_menu.week_start,
+        "used_template": used_template,
         "date": normalize_to_iso_date(date_str),
         "day": day_name,
         "breakfast": day_block.get("Breakfast", {"items": "", "price": 0}),
@@ -886,12 +911,11 @@ def get_today_menu_from_weekly_menu(date_str):
 
 
 def get_meal_price_from_weekly_menu(date_str, meal_type):
-    week_start = get_week_start_from_date(date_str)
+    weekly_menu, calendar_week_start, used_template = get_active_weekly_menu_for_date(date_str)
     day_name = get_day_name_from_date(date_str)
 
-    weekly_menu = WeeklyMenu.query.filter_by(week_start=week_start).first()
     if not weekly_menu:
-        return None, f"No weekly menu found for week starting {week_start}"
+        return None, "No weekly menu template found. Please add weekly menu once."
 
     weekly_items = weekly_menu.weekly_items or {}
     day_block = weekly_items.get(day_name, {})
@@ -1070,7 +1094,10 @@ def sync_attendance_bill(attendance_row):
 @api.get("/menu/weekly")
 @jwt_required()
 def get_weekly_menus():
-    menus = WeeklyMenu.query.order_by(WeeklyMenu.week_start.desc()).all()
+    menus = WeeklyMenu.query.order_by(
+        WeeklyMenu.updated_at.desc(),
+        WeeklyMenu.id.desc()
+    ).all()
     return jsonify([serialize_weekly_menu(m) for m in menus])
 
 
@@ -1403,6 +1430,69 @@ def get_all_meal_plans():
         print("GET ALL MEAL PLANS ERROR:", e)
         return jsonify({"error": "Failed to load meal confirmations"}), 500
 
+def create_bill_from_meal_plan(user_id, plan_date, meal_type, is_selected):
+    existing_attendance = Attendance.query.filter_by(
+        user_id=user_id,
+        date=plan_date,
+        meal_type=meal_type
+    ).first()
+
+    status = "Taken" if is_selected else "Skipped"
+
+    if existing_attendance:
+        existing_attendance.status = status
+        attendance = existing_attendance
+    else:
+        attendance = Attendance(
+            user_id=user_id,
+            date=plan_date,
+            meal_type=meal_type,
+            status=status
+        )
+        db.session.add(attendance)
+        db.session.flush()
+
+    existing_bill = Bill.query.filter_by(attendance_id=attendance.id).first()
+
+    if not is_selected:
+        if existing_bill and existing_bill.status != "Paid":
+            Payment.query.filter_by(bill_id=existing_bill.id).delete()
+            db.session.delete(existing_bill)
+        return None
+
+    price, price_error = get_meal_price_from_weekly_menu(plan_date, meal_type)
+
+    if price_error:
+        price = 0
+
+    if existing_bill:
+        if existing_bill.status == "Paid":
+            return existing_bill
+
+        existing_bill.user_id = user_id
+        existing_bill.month = plan_date
+        existing_bill.bill_type = "daily"
+        existing_bill.meal_type = meal_type
+        existing_bill.amount = price
+        existing_bill.status = "Unpaid"
+        existing_bill.parent_bill_id = None
+        return existing_bill
+
+    new_bill = Bill(
+        user_id=user_id,
+        month=plan_date,
+        bill_type="daily",
+        meal_type=meal_type,
+        attendance_id=attendance.id,
+        parent_bill_id=None,
+        amount=price,
+        status="Unpaid"
+    )
+
+    db.session.add(new_bill)
+    db.session.flush()
+    return new_bill
+
 
 @api.post("/meal-plans")
 @jwt_required()
@@ -1440,6 +1530,23 @@ def save_meal_plan():
             db.session.add(meal_plan)
             db.session.flush()
 
+        generated_bill_rows = []
+
+        for meal_type, selected in {
+            "Breakfast": breakfast,
+            "Lunch": lunch,
+            "Dinner": dinner
+        }.items():
+            bill = create_bill_from_meal_plan(
+                user.id,
+                plan_date,
+                meal_type,
+                selected
+            )
+
+            if bill:
+                generated_bill_rows.append(bill)
+
         selected_meals, total_amount = get_meal_plan_price_summary(
             plan_date,
             breakfast,
@@ -1450,14 +1557,29 @@ def save_meal_plan():
         db.session.add(Notification(
             user_id=user.id,
             title="Meal Confirmation Saved",
-            message=f"Your meal confirmation for {formatDateForMail(plan_date)} has been saved. Estimated amount: ₹{total_amount}"
+            message=f"Your meal confirmation for {formatDateForMail(plan_date)} has been saved. Attendance and bills generated successfully."
         ))
+
+        db.session.commit()
+
+        generated_bills_data = [
+            serialize_bill_row(bill) for bill in generated_bill_rows
+        ]
 
         email_sent = False
         email_error = None
 
         if user.email:
             try:
+                for bill in generated_bill_rows:
+                    send_bill_email(
+                        user.email,
+                        user.name,
+                        f"{bill.meal_type} Meal Bill",
+                        bill.month,
+                        bill.amount
+                    )
+
                 send_meal_confirmation_email(
                     user.email,
                     user.name,
@@ -1465,15 +1587,18 @@ def save_meal_plan():
                     selected_meals,
                     total_amount
                 )
+
                 email_sent = True
+
             except Exception as mail_error:
                 email_error = str(mail_error)
-                print("MEAL CONFIRMATION EMAIL ERROR:", mail_error)
-
-        db.session.commit()
+                print("MEAL BILL EMAIL ERROR:", mail_error)
 
         return jsonify({
-            "message": f"Meal plan for {formatDateForMail(plan_date)} saved successfully. Estimated amount: ₹{total_amount}",
+            "message": "Meal confirmation saved. Attendance and bills generated successfully." + (
+                " Email sent successfully." if email_sent else " Email could not be sent."
+            ),
+            "generated_bills": generated_bills_data,
             "email_sent": email_sent,
             "email_error": email_error,
             "meal_plan": {
@@ -1491,7 +1616,7 @@ def save_meal_plan():
     except Exception as e:
         db.session.rollback()
         print("SAVE MEAL PLAN ERROR:", e)
-        return jsonify({"error": "Failed to save meal confirmation"}), 500
+        return jsonify({"error": "Failed to save meal confirmation and generate bill"}), 500
 
 # =========================
 # INVENTORY HELPER FUNCTIONS
@@ -2292,6 +2417,8 @@ def pay_bill():
         mode = (request.form.get("mode") or "UPI").strip()
         note = (request.form.get("note") or "").strip()
         proof = request.files.get("proof")
+        if not proof:
+              return jsonify({"error": "Payment proof is required"}), 400
 
         if not bill_id:
             return jsonify({"error": "bill_id is required"}), 400

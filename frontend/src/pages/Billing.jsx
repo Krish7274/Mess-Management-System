@@ -20,9 +20,7 @@ function formatPeriod(period, billType) {
       "July", "August", "September", "October", "November", "December",
     ];
 
-    if (y && m) {
-      return `${monthNames[Number(m) - 1] || m}, ${y}`;
-    }
+    if (y && m) return `${monthNames[Number(m) - 1] || m}, ${y}`;
   }
 
   return period;
@@ -39,8 +37,7 @@ function buildUpiLink(bill) {
 }
 
 function buildQrUrl(bill) {
-  const upiLink = buildUpiLink(bill);
-  return `https://quickchart.io/qr?size=260&text=${encodeURIComponent(upiLink)}`;
+  return `https://quickchart.io/qr?size=260&text=${encodeURIComponent(buildUpiLink(bill))}`;
 }
 
 function getSearchableText(bill) {
@@ -51,6 +48,7 @@ function getSearchableText(bill) {
     bill?.status,
     bill?.user_name,
     bill?.user_email,
+    bill?.payment?.mode,
     bill?.amount,
   ]
     .filter(Boolean)
@@ -72,8 +70,9 @@ export default function Billing() {
   const [err, setErr] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
-  const [showQrModal, setShowQrModal] = useState(false);
+  const [showPayModal, setShowPayModal] = useState(false);
   const [selectedBill, setSelectedBill] = useState(null);
+  const [paymentMode, setPaymentMode] = useState("UPI");
   const [note, setNote] = useState("");
   const [proof, setProof] = useState(null);
   const [paying, setPaying] = useState(false);
@@ -116,10 +115,7 @@ export default function Billing() {
       setErr("");
 
       const payload = { period: monthPeriod };
-
-      if (isAdminOrStaff && selectedUserId) {
-        payload.user_id = Number(selectedUserId);
-      }
+      if (isAdminOrStaff && selectedUserId) payload.user_id = Number(selectedUserId);
 
       const res = await api.post("/billing/generate-monthly", payload);
       setMsg(res.data?.message || "Monthly attendance bill generated successfully");
@@ -133,48 +129,52 @@ export default function Billing() {
 
   function openPayModal(bill) {
     setSelectedBill(bill);
+    setPaymentMode("UPI");
     setNote("");
     setProof(null);
-    setShowQrModal(true);
+    setShowPayModal(true);
   }
 
   function closePayModal() {
-    setShowQrModal(false);
+    setShowPayModal(false);
     setSelectedBill(null);
+    setPaymentMode("UPI");
     setNote("");
     setProof(null);
   }
 
   async function submitPayment() {
-    if (!selectedBill) return;
+  if (!selectedBill) return;
 
-    try {
-      setPaying(true);
-      setMsg("");
-      setErr("");
-
-      const formData = new FormData();
-      formData.append("bill_id", selectedBill.id);
-      formData.append("mode", "UPI");
-      formData.append("note", note);
-
-      if (proof) {
-        formData.append("proof", proof);
-      }
-
-      const res = await api.post("/billing/pay", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      setMsg(res.data?.message || "Payment recorded successfully");
-      closePayModal();
-      await loadBills();
-    } catch (e) {
-      setErr(e?.response?.data?.error || "Failed to update payment");
-    } finally {
-      setPaying(false);
-    }
+  if (!proof) {
+    setErr("Payment proof is required. Please upload proof before submitting.");
+    return;
   }
+
+  try {
+    setPaying(true);
+    setMsg("");
+    setErr("");
+
+    const formData = new FormData();
+    formData.append("bill_id", selectedBill.id);
+    formData.append("mode", paymentMode);
+    formData.append("note", note);
+    formData.append("proof", proof);
+
+    const res = await api.post("/billing/pay", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    setMsg(res.data?.message || `${paymentMode} payment recorded successfully`);
+    closePayModal();
+    await loadBills();
+  } catch (e) {
+    setErr(e?.response?.data?.error || "Failed to update payment");
+  } finally {
+    setPaying(false);
+  }
+}
 
   const filteredBills = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -201,8 +201,8 @@ export default function Billing() {
               <h1>{isAdminOrStaff ? "All Bills" : "My Bills"}</h1>
               <p className="muted">
                 {isAdminOrStaff
-                  ? "View all users bills, search records, generate monthly bills, and complete UPI payments."
-                  : "View your bills, search records, generate monthly bills, and complete UPI payments."}
+                  ? "View all users bills, search records, generate monthly bills, and complete UPI or cash payments."
+                  : "View your bills, search records, generate monthly bills, and complete UPI or cash payments."}
               </p>
             </div>
           </div>
@@ -265,8 +265,8 @@ export default function Billing() {
                 type="text"
                 placeholder={
                   isAdminOrStaff
-                    ? "Search by date, month, bill type, meal type, amount, status, student name, or email"
-                    : "Search by date, month, bill type, meal type, amount, or status"
+                    ? "Search by date, month, bill type, meal type, amount, status, student name, email, or payment mode"
+                    : "Search by date, month, bill type, meal type, amount, status, or payment mode"
                 }
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -321,8 +321,11 @@ export default function Billing() {
                         </td>
                         <td>
                           {bill.can_pay ? (
-                            <button className="btn btnBlue billingSmallBtn" onClick={() => openPayModal(bill)}>
-                              Pay (UPI)
+                            <button
+                              className="btn btnBlue billingSmallBtn"
+                              onClick={() => openPayModal(bill)}
+                            >
+                              Pay
                             </button>
                           ) : (
                             <span className="muted">-</span>
@@ -352,6 +355,7 @@ export default function Billing() {
                     <th>Bill Type</th>
                     <th>Meal</th>
                     <th>Amount</th>
+                    <th>Mode</th>
                     <th>Status</th>
                     <th>Proof</th>
                   </tr>
@@ -359,7 +363,7 @@ export default function Billing() {
                 <tbody>
                   {paidBills.length === 0 ? (
                     <tr>
-                      <td colSpan={isAdminOrStaff ? 8 : 6} className="billingEmptyCell">
+                      <td colSpan={isAdminOrStaff ? 9 : 7} className="billingEmptyCell">
                         No paid bills found
                       </td>
                     </tr>
@@ -372,6 +376,11 @@ export default function Billing() {
                         <td>{bill.bill_type === "monthly" ? "Monthly" : "Daily"}</td>
                         <td>{bill.meal_type || "-"}</td>
                         <td>{formatMoney(bill.amount)}</td>
+                        <td>
+                          <span className="billingModeBadge">
+                            {bill.payment?.mode || "-"}
+                          </span>
+                        </td>
                         <td>
                           <span className="billingTableBadge billingStatusPaid">
                             {bill.status}
@@ -401,68 +410,122 @@ export default function Billing() {
         </div>
       </div>
 
-      {showQrModal && selectedBill && (
+      {showPayModal && selectedBill && (
         <div className="qrModalOverlay" onClick={closePayModal}>
           <div className="qrModalCard billingQrModalCard" onClick={(e) => e.stopPropagation()}>
+            <div className="billingPayTop">
+              <div>
+                <h2 className="qrTitle">Complete Payment</h2>
+                <p className="qrAmountText">
+                  Amount to pay: {formatMoney(selectedBill.amount)}
+                </p>
+              </div>
+
+              <button className="btn btnRed billingCloseBtn" onClick={closePayModal}>
+                Close
+              </button>
+            </div>
+
+            <div className="billingModeSelector">
+              <button
+                type="button"
+                className={`billingModeOption ${paymentMode === "UPI" ? "active" : ""}`}
+                onClick={() => setPaymentMode("UPI")}
+              >
+                Pay by UPI
+              </button>
+
+              <button
+                type="button"
+                className={`billingModeOption ${paymentMode === "Cash" ? "active cash" : ""}`}
+                onClick={() => setPaymentMode("Cash")}
+              >
+                Pay by Cash
+              </button>
+            </div>
+
             <div className="billingQrLayout">
               <div className="billingQrLeft">
-                <h2 className="qrTitle">UPI Payment</h2>
-                <p className="qrAmountText">Amount to pay: {formatMoney(selectedBill.amount)}</p>
+                {paymentMode === "UPI" ? (
+                  <>
+                    <div className="qrPreviewCard">
+                      <img
+                        className="qrImage qrImageSmall"
+                        src={buildQrUrl(selectedBill)}
+                        alt="UPI QR"
+                      />
 
-                <div className="qrPreviewCard">
-                  <img
-                    className="qrImage qrImageSmall"
-                    src={buildQrUrl(selectedBill)}
-                    alt="UPI QR"
-                  />
+                      <div className="qrInfoText">
+                        <p><strong>{UPI_NAME}</strong></p>
+                        <p>UPI ID: {UPI_ID}</p>
+                        <p className="muted">
+                          Scan this QR and the exact amount will be filled automatically.
+                        </p>
+                      </div>
+                    </div>
 
-                  <div className="qrInfoText">
-                    <p><strong>{UPI_NAME}</strong></p>
-                    <p>UPI ID: {UPI_ID}</p>
+                    <div className="upiLinkBox">
+                      <label className="muted">UPI Link</label>
+                      <textarea className="input" readOnly value={buildUpiLink(selectedBill)} />
+                    </div>
+                  </>
+                ) : (
+                  <div className="cashInfoCard">
+                    <div className="cashIcon">₹</div>
+                    <h3>Cash Payment</h3>
                     <p className="muted">
-                      Scan this QR and the exact amount will be filled automatically.
+                      Select this option when the student pays the amount by cash.
+                      Payment will be recorded as Cash.
                     </p>
+                    <h2>{formatMoney(selectedBill.amount)}</h2>
                   </div>
-                </div>
+                )}
               </div>
 
               <div className="billingQrRight">
                 <div className="qrFormSection">
-                  <label className="muted">Add note (optional)</label>
+                  <label className="muted">Add note optional</label>
                   <textarea
                     className="input"
-                    placeholder="Add note (optional)"
+                    placeholder={
+                      paymentMode === "Cash"
+                        ? "Example: Cash received by staff"
+                        : "Add UPI transaction note"
+                    }
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                   />
                 </div>
 
                 <div className="qrFormSection">
-                  <label className="muted">Upload payment proof</label>
+                  <label className="muted">
+                   Upload payment proof <span style={{ color: "#fb7185" }}>*required</span>
+                  </label>
                   <input
                     className="input billingFileInput"
                     type="file"
                     accept="image/*"
+                    required
                     onChange={(e) => setProof(e.target.files?.[0] || null)}
                   />
+                  {!proof && (
+    <p className="muted" style={{ color: "#fb7185", marginTop: "8px" }}>
+      Payment proof is compulsory.
+    </p>
+  )}
                 </div>
 
                 <div className="row qrButtonRow billingQrButtonRow">
                   <button className="btn btnBlue" disabled={paying} onClick={submitPayment}>
-                    I Have Paid
+                    {paying
+                      ? "Saving..."
+                      : paymentMode === "Cash"
+                      ? "Confirm Cash Payment"
+                      : "I Have Paid by UPI"}
                   </button>
                   <button className="btn btnRed" onClick={closePayModal}>
-                    Close
+                    Cancel
                   </button>
-                </div>
-
-                <div className="upiLinkBox">
-                  <label className="muted">UPI Link</label>
-                  <textarea
-                    className="input"
-                    readOnly
-                    value={buildUpiLink(selectedBill)}
-                  />
                 </div>
               </div>
             </div>
