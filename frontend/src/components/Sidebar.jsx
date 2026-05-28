@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { getUser, logout } from "../auth";
 
@@ -7,6 +8,19 @@ export default function Sidebar() {
 
   const userName = user?.name || "User";
   const userRole = user?.role || "User";
+
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem("mess_theme") || "dark";
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("mess_theme", theme);
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"));
+  }
 
   function handleLogout() {
     logout();
@@ -69,6 +83,17 @@ export default function Sidebar() {
       </nav>
 
       <div className="topbarRight">
+        <button
+          type="button"
+          className="themeToggleBtn"
+          onClick={toggleTheme}
+          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+        >
+          <span className="themeToggleIcon">{theme === "dark" ? "☀️" : "🌙"}</span>
+          <span>{theme === "dark" ? "Light" : "Dark"}</span>
+        </button>
+
         <NavLink
           to="/app/help-centre"
           className={({ isActive }) =>

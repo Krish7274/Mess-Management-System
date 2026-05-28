@@ -15,6 +15,13 @@ function tomorrowYYYYMMDD() {
   return toYYYYMMDD(d);
 }
 
+const lightGraphColors = {
+  taking: "#34d399",
+  skipping: "#a78bfa",
+  paid: "#2dd4bf",
+  unpaid: "#8b5cf6",
+};
+
 function formatDate(dateStr) {
   if (!dateStr) return "-";
   const d = new Date(dateStr);
@@ -26,7 +33,7 @@ function formatDate(dateStr) {
   });
 }
 
-function DonutChart({ taken, skipped, centerLabel = "Taking" }) {
+function DonutChart({ taken, skipped, centerLabel = "Taking", variant = "meal" }) {
   const total = Math.max(Number(taken || 0) + Number(skipped || 0), 1);
   const percent = Math.round((Number(taken || 0) / total) * 100);
   const radius = 44;
@@ -35,7 +42,7 @@ function DonutChart({ taken, skipped, centerLabel = "Taking" }) {
   const dashSkipped = circumference - dashTaken;
 
   return (
-    <div className="dashboardDonutWrap">
+    <div className={`dashboardDonutWrap donutVariant-${variant}`}>
       <svg className="dashboardDonut" viewBox="0 0 120 120">
         <circle className="donutTrack" cx="60" cy="60" r={radius} />
         <circle
@@ -69,7 +76,13 @@ function PillarChart({ paid, unpaid }) {
   const unpaidHeight = Math.max((Number(unpaid || 0) / max) * 100, unpaid > 0 ? 12 : 4);
 
   return (
-    <div className="dashboardPillarChart">
+    <div className="dashboardPillarChart modernBarChart">
+      <div className="pillarGridLines" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
       <div className="pillarItem">
         <div className="pillarValue">{paid}</div>
         <div className="pillarBarShell">
@@ -257,7 +270,7 @@ export default function Dashboard() {
           </div>
 
           <div className="dashboardChartsGrid">
-            <div className="card dashboardChartCard">
+            <div className="card dashboardChartCard dashboard-graph-card">
               <div className="dashboardChartHead">
                 <div>
                   <h3>Next Day Meal Plan</h3>
@@ -268,24 +281,27 @@ export default function Dashboard() {
                 <span className="badge">Meal</span>
               </div>
 
+              <div className="graph-icon-box graph-icon-meal" aria-hidden="true">🍽️</div>
+
               <DonutChart
                 taken={dashboardStats.takingMeal}
                 skipped={dashboardStats.skippedMeal}
+                variant="meal"
               />
 
               <div className="dashboardLegend">
                 <div>
-                  <span className="legendDot legendGreen"></span>
+                  <span className="legendDot legendTeal"></span>
                   Taking: {dashboardStats.takingMeal}
                 </div>
                 <div>
-                  <span className="legendDot legendRed"></span>
+                  <span className="legendDot legendPurple"></span>
                   Skipping: {dashboardStats.skippedMeal}
                 </div>
               </div>
             </div>
 
-            <div className="card dashboardChartCard">
+            <div className="card dashboardChartCard dashboard-graph-card">
               <div className="dashboardChartHead">
                 <div>
                   <h3>Bill Payment Status</h3>
@@ -294,6 +310,8 @@ export default function Dashboard() {
                 <span className="badge">Billing</span>
               </div>
 
+              <div className="graph-icon-box graph-icon-bill" aria-hidden="true">🧾</div>
+
               <PillarChart
                 paid={dashboardStats.paidStudents}
                 unpaid={dashboardStats.unpaidStudents}
@@ -301,11 +319,11 @@ export default function Dashboard() {
 
               <div className="dashboardLegend">
                 <div>
-                  <span className="legendDot legendBlue"></span>
+                  <span className="legendDot legendTeal"></span>
                   Paid Students: {dashboardStats.paidStudents}
                 </div>
                 <div>
-                  <span className="legendDot legendOrange"></span>
+                  <span className="legendDot legendPurple"></span>
                   Unpaid Students: {dashboardStats.unpaidStudents}
                 </div>
               </div>
@@ -349,7 +367,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div className="card dashboardChartCard studentBillChartCard">
+          <div className="card dashboardChartCard dashboard-graph-card studentBillChartCard">
             <div className="dashboardChartHead">
               <div>
                 <h3>My Bill Status</h3>
@@ -358,19 +376,22 @@ export default function Dashboard() {
               <span className="badge">My Bills</span>
             </div>
 
+            <div className="graph-icon-box graph-icon-bill" aria-hidden="true">🧾</div>
+
             <DonutChart
               taken={myBillStats.paid}
               skipped={myBillStats.unpaid}
               centerLabel="Paid"
+              variant="bill"
             />
 
             <div className="dashboardLegend">
               <div>
-                <span className="legendDot legendGreen"></span>
+                <span className="legendDot legendTeal"></span>
                 Paid: {myBillStats.paid} Bills
               </div>
               <div>
-                <span className="legendDot legendRed"></span>
+                <span className="legendDot legendPurple"></span>
                 Unpaid: {myBillStats.unpaid} Bills
               </div>
             </div>

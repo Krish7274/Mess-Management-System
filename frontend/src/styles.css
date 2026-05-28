@@ -3932,3 +3932,2382 @@ hr{
     grid-template-columns: 1fr;
   }
 }
+/* =========================================================
+   THEME MODE SUPPORT - DARK DEFAULT + ATTRACTIVE LIGHT MODE
+   Added for light/dark switch. Dark mode keeps existing design.
+   ========================================================= */
+
+:root[data-theme="light"]{
+  --bg:#f4fbf7;
+  --bg-soft:#ecfdf5;
+  --card:#ffffff;
+  --card-2:#f8fffb;
+  --panel:#ffffff;
+  --panel-strong:#e8f8ef;
+
+  --green:#16a34a;
+  --green-dark:#15803d;
+  --green-light:#22c55e;
+
+  --grey:#64748b;
+  --grey-soft:#475569;
+  --grey-dark:#334155;
+
+  --text:#0f172a;
+  --text-soft:#475569;
+  --text-light:#0f172a;
+  --text-dark:#0f172a;
+
+  --blue:#0284c7;
+  --blue-dark:#0369a1;
+  --red:#ef4444;
+  --red-dark:#dc2626;
+  --orange:#f97316;
+  --orange-dark:#ea580c;
+  --orange-light:#fb923c;
+
+  --border:rgba(15,23,42,0.10);
+  --border-strong:rgba(22,163,74,0.24);
+  --shadow:0 18px 42px rgba(15,23,42,0.10);
+  --shadow-soft:0 10px 24px rgba(15,23,42,0.08);
+
+  --auth-primary:#16a34a;
+  --auth-primary-2:#15803d;
+  --auth-blue:#0284c7;
+  --auth-blue-dark:#0369a1;
+  --auth-text:#0f172a;
+  --auth-muted:#475569;
+  --auth-border:rgba(15,23,42,0.10);
+  --auth-glass:rgba(255,255,255,0.90);
+  --auth-shadow:0 24px 60px rgba(15,23,42,0.16);
+}
+
+html,
+body,
+#root,
+.appLayout{
+  transition:background .25s ease,color .25s ease,border-color .25s ease;
+}
+
+:root[data-theme="light"] body{
+  color:var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(34,197,94,0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(56,189,248,0.13), transparent 27%),
+    radial-gradient(circle at bottom left, rgba(250,204,21,0.10), transparent 25%),
+    linear-gradient(135deg, #f8fffb 0%, #eefbf3 46%, #f8fafc 100%);
+}
+
+:root[data-theme="light"] .topbar,
+:root[data-theme="light"] .navbar,
+:root[data-theme="light"] .header,
+:root[data-theme="light"] .app-navbar{
+  background:linear-gradient(135deg, rgba(255,255,255,0.94), rgba(236,253,245,0.94));
+  border-bottom:1px solid rgba(22,163,74,0.16);
+  box-shadow:0 14px 34px rgba(15,23,42,0.10);
+}
+
+:root[data-theme="light"] .brandBlock,
+:root[data-theme="light"] .brandTitle,
+:root[data-theme="light"] .brandSubtext,
+:root[data-theme="light"] h1,
+:root[data-theme="light"] h2,
+:root[data-theme="light"] h3,
+:root[data-theme="light"] h4,
+:root[data-theme="light"] h5,
+:root[data-theme="light"] h6{
+  color:#0f172a;
+}
+
+:root[data-theme="light"] .brandSubtext,
+:root[data-theme="light"] p,
+:root[data-theme="light"] .muted,
+:root[data-theme="light"] label,
+:root[data-theme="light"] .smallText{
+  color:#475569;
+}
+
+.themeToggleBtn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:10px 14px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.10);
+  background:linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+  color:#ffffff;
+  font-weight:900;
+  font-size:14px;
+  white-space:nowrap;
+  cursor:pointer;
+  box-shadow:0 8px 18px rgba(0,0,0,0.18);
+  transition:all .22s ease;
+}
+
+.themeToggleBtn:hover{
+  transform:translateY(-2px);
+  border-color:rgba(34,197,94,0.34);
+  box-shadow:0 12px 24px rgba(34,197,94,0.20);
+}
+
+.themeToggleIcon{
+  width:22px;
+  height:22px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:50%;
+  background:rgba(34,197,94,0.16);
+}
+
+:root[data-theme="light"] .themeToggleBtn{
+  background:linear-gradient(135deg, #ffffff, #ecfdf5);
+  border-color:rgba(22,163,74,0.18);
+  color:#0f172a;
+  box-shadow:0 10px 24px rgba(15,23,42,0.08);
+}
+
+:root[data-theme="light"] .themeToggleIcon{
+  background:rgba(22,163,74,0.12);
+}
+
+:root[data-theme="light"] .navItem,
+:root[data-theme="light"] .helpTopBtn{
+  background:rgba(255,255,255,0.78);
+  border-color:rgba(15,23,42,0.10);
+  color:#0f172a;
+  box-shadow:0 8px 18px rgba(15,23,42,0.06);
+}
+
+:root[data-theme="light"] .navItem:hover,
+:root[data-theme="light"] .navItem.active,
+:root[data-theme="light"] .helpTopBtn:hover,
+:root[data-theme="light"] .helpTopBtn.active{
+  background:linear-gradient(135deg, #22c55e, #16a34a);
+  color:#ffffff;
+  border-color:transparent;
+  box-shadow:0 12px 26px rgba(22,163,74,0.22);
+}
+
+:root[data-theme="light"] .card,
+:root[data-theme="light"] .dashboardHeroCard,
+:root[data-theme="light"] .dashboardChartCard,
+:root[data-theme="light"] .dashboardStatCard,
+:root[data-theme="light"] .menu-day-card,
+:root[data-theme="light"] .weekly-form-card,
+:root[data-theme="light"] .admin-users-card,
+:root[data-theme="light"] .import-summary-card,
+:root[data-theme="light"] .help-card,
+:root[data-theme="light"] .help-chat-card{
+  background:linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,255,251,0.92));
+  color:#0f172a;
+  border-color:rgba(22,163,74,0.16);
+  box-shadow:0 18px 44px rgba(15,23,42,0.10);
+}
+
+:root[data-theme="light"] .card::before,
+:root[data-theme="light"] .dashboardHeroCard::before,
+:root[data-theme="light"] .dashboardStatCard::after,
+:root[data-theme="light"] .menu-day-card::before{
+  opacity:.55;
+}
+
+:root[data-theme="light"] .badge{
+  background:rgba(22,163,74,0.10);
+  border-color:rgba(22,163,74,0.20);
+  color:#166534;
+}
+
+:root[data-theme="light"] .input,
+:root[data-theme="light"] input,
+:root[data-theme="light"] select,
+:root[data-theme="light"] textarea{
+  background:linear-gradient(180deg, #ffffff, #f8fffb);
+  border-color:rgba(15,23,42,0.14);
+  color:#0f172a;
+  box-shadow:0 8px 18px rgba(15,23,42,0.04);
+}
+
+:root[data-theme="light"] .input:focus,
+:root[data-theme="light"] input:focus,
+:root[data-theme="light"] select:focus,
+:root[data-theme="light"] textarea:focus{
+  border-color:rgba(22,163,74,0.45);
+  box-shadow:0 0 0 4px rgba(34,197,94,0.12);
+}
+
+:root[data-theme="light"] table,
+:root[data-theme="light"] .table{
+  background:#ffffff;
+  color:#0f172a;
+}
+
+:root[data-theme="light"] th{
+  background:linear-gradient(135deg, #dcfce7, #f0fdf4);
+  color:#14532d;
+}
+
+:root[data-theme="light"] td{
+  color:#1e293b;
+  border-color:rgba(15,23,42,0.08);
+}
+
+:root[data-theme="light"] tr:hover td{
+  background:rgba(34,197,94,0.05);
+}
+
+:root[data-theme="light"] .dashboardDonut,
+:root[data-theme="light"] .dashboardPillarChart,
+:root[data-theme="light"] .dashboardLegend div{
+  background:rgba(255,255,255,0.72);
+  border-color:rgba(15,23,42,0.10);
+}
+
+:root[data-theme="light"] .dashboardDonutCenter strong{
+  color:#16a34a;
+}
+
+:root[data-theme="light"] .btnGreen,
+:root[data-theme="light"] .dashboardRefreshBtn{
+  background:linear-gradient(135deg, #22c55e, #16a34a);
+  color:#ffffff;
+}
+
+:root[data-theme="light"] .btnBlue{
+  background:linear-gradient(135deg, #38bdf8, #2563eb);
+  color:#ffffff;
+}
+
+:root[data-theme="light"] .btnOrange{
+  background:linear-gradient(135deg, #fb923c, #f97316);
+  color:#ffffff;
+}
+
+:root[data-theme="light"] .logoutBtn,
+:root[data-theme="light"] .btnRed{
+  background:linear-gradient(135deg, #fb7185, #ef4444);
+  color:#ffffff;
+}
+
+:root[data-theme="light"] a{
+  color:#15803d;
+}
+
+:root[data-theme="light"] .logoutBtn,
+:root[data-theme="light"] .btn,
+:root[data-theme="light"] .dashboardRefreshBtn{
+  box-shadow:0 12px 24px rgba(15,23,42,0.10);
+}
+
+@media (max-width:1100px){
+  .topbarRight{
+    gap:12px;
+  }
+
+  .themeToggleBtn{
+    padding:9px 12px;
+  }
+}
+
+/* =========================================================
+   FINAL LIGHT MODE POLISH - WHITE + ORANGE PROFESSIONAL UI
+   Dark mode remains unchanged. These rules only apply in light mode.
+   ========================================================= */
+:root[data-theme="light"]{
+  --bg:#fffaf3;
+  --bg-soft:#fff7ed;
+  --card:#ffffff;
+  --card-2:#fffdf8;
+  --panel:#ffffff;
+  --panel-strong:#ffedd5;
+  --green:#16a34a;
+  --green-dark:#15803d;
+  --green-light:#22c55e;
+  --orange:#f97316;
+  --orange-dark:#ea580c;
+  --orange-light:#fb923c;
+  --text:#111827;
+  --text-soft:#475569;
+  --text-light:#111827;
+  --border:rgba(234,88,12,.18);
+  --border-strong:rgba(249,115,22,.32);
+  --shadow:0 18px 45px rgba(124,45,18,.12);
+  --shadow-soft:0 10px 28px rgba(124,45,18,.10);
+}
+
+:root[data-theme="light"] body{
+  color:#111827 !important;
+  background:
+    radial-gradient(circle at 8% 8%, rgba(251,146,60,.22), transparent 26%),
+    radial-gradient(circle at 90% 10%, rgba(34,197,94,.13), transparent 24%),
+    radial-gradient(circle at 70% 90%, rgba(253,186,116,.18), transparent 26%),
+    linear-gradient(135deg,#fffaf3 0%,#fff7ed 38%,#ffffff 100%) !important;
+}
+
+:root[data-theme="light"] .topbar,
+:root[data-theme="light"] .navbar,
+:root[data-theme="light"] .header,
+:root[data-theme="light"] .app-navbar{
+  background:rgba(255,255,255,.94) !important;
+  border-bottom:1px solid rgba(249,115,22,.18) !important;
+  box-shadow:0 14px 35px rgba(124,45,18,.10) !important;
+}
+
+:root[data-theme="light"] h1,
+:root[data-theme="light"] h2,
+:root[data-theme="light"] h3,
+:root[data-theme="light"] h4,
+:root[data-theme="light"] h5,
+:root[data-theme="light"] h6,
+:root[data-theme="light"] .brandTitle,
+:root[data-theme="light"] .brandBlock,
+:root[data-theme="light"] .dashboardChartHead h3,
+:root[data-theme="light"] .pillarValue{
+  color:#111827 !important;
+}
+
+:root[data-theme="light"] p,
+:root[data-theme="light"] label,
+:root[data-theme="light"] span,
+:root[data-theme="light"] small,
+:root[data-theme="light"] .brandSubtext,
+:root[data-theme="light"] .smallText,
+:root[data-theme="light"] .muted{
+  color:#475569;
+}
+
+:root[data-theme="light"] .navItem,
+:root[data-theme="light"] .helpTopBtn,
+:root[data-theme="light"] .themeToggleBtn{
+  background:#ffffff !important;
+  color:#111827 !important;
+  border:1px solid rgba(249,115,22,.16) !important;
+  box-shadow:0 8px 20px rgba(124,45,18,.08) !important;
+}
+
+:root[data-theme="light"] .navItem:hover,
+:root[data-theme="light"] .navItem.active,
+:root[data-theme="light"] .helpTopBtn:hover,
+:root[data-theme="light"] .helpTopBtn.active,
+:root[data-theme="light"] .themeToggleBtn:hover{
+  background:linear-gradient(135deg,#fb923c,#f97316) !important;
+  color:#ffffff !important;
+  border-color:transparent !important;
+  box-shadow:0 12px 28px rgba(249,115,22,.25) !important;
+}
+
+:root[data-theme="light"] .dashboardHeroCard,
+:root[data-theme="light"] .dashboardStatCard,
+:root[data-theme="light"] .dashboardChartCard,
+:root[data-theme="light"] .card,
+:root[data-theme="light"] .profileCard,
+:root[data-theme="light"] .menuPage,
+:root[data-theme="light"] .menuCard,
+:root[data-theme="light"] .weekly-form-card,
+:root[data-theme="light"] .menu-day-card,
+:root[data-theme="light"] .inventory-card,
+:root[data-theme="light"] .inventory-summary-card,
+:root[data-theme="light"] .help-card,
+:root[data-theme="light"] .help-chat-card,
+:root[data-theme="light"] .admin-users-card,
+:root[data-theme="light"] .billing-card,
+:root[data-theme="light"] .complaint-card,
+:root[data-theme="light"] .notification-card,
+:root[data-theme="light"] .attendance-card,
+:root[data-theme="light"] .import-summary-card,
+:root[data-theme="light"] .authCard,
+:root[data-theme="light"] .auth-card{
+  background:linear-gradient(180deg,#ffffff 0%,#fffaf3 100%) !important;
+  color:#111827 !important;
+  border:1px solid rgba(249,115,22,.18) !important;
+  box-shadow:0 18px 45px rgba(124,45,18,.11) !important;
+}
+
+:root[data-theme="light"] .dashboardHeroCard::before,
+:root[data-theme="light"] .dashboardStatCard::after,
+:root[data-theme="light"] .dashboardChartCard::before,
+:root[data-theme="light"] .menu-day-card::before{
+  background:linear-gradient(135deg,rgba(251,146,60,.20),rgba(34,197,94,.10)) !important;
+  opacity:1 !important;
+}
+
+:root[data-theme="light"] .dashboardStatCard strong,
+:root[data-theme="light"] .dashboardStatCard h2,
+:root[data-theme="light"] .dashboardStatCard .statValue{
+  color:#f97316 !important;
+}
+
+:root[data-theme="light"] input,
+:root[data-theme="light"] select,
+:root[data-theme="light"] textarea,
+:root[data-theme="light"] .input{
+  background:#ffffff !important;
+  color:#111827 !important;
+  border:1px solid rgba(148,163,184,.42) !important;
+  box-shadow:0 8px 20px rgba(124,45,18,.05) !important;
+}
+
+:root[data-theme="light"] input::placeholder,
+:root[data-theme="light"] textarea::placeholder{
+  color:#64748b !important;
+}
+
+:root[data-theme="light"] input:focus,
+:root[data-theme="light"] select:focus,
+:root[data-theme="light"] textarea:focus{
+  border-color:#fb923c !important;
+  box-shadow:0 0 0 4px rgba(251,146,60,.18) !important;
+}
+
+:root[data-theme="light"] .badge,
+:root[data-theme="light"] .meal-badge,
+:root[data-theme="light"] .statusBadge{
+  background:#fff7ed !important;
+  color:#c2410c !important;
+  border:1px solid rgba(249,115,22,.28) !important;
+}
+
+:root[data-theme="light"] .dashboardDonutWrap{
+  background:linear-gradient(180deg,#ffffff,#fff7ed) !important;
+  border:1px solid rgba(249,115,22,.16) !important;
+  border-radius:30px !important;
+  box-shadow:0 16px 38px rgba(124,45,18,.10) !important;
+  padding:18px !important;
+}
+
+:root[data-theme="light"] .dashboardDonut{
+  filter:drop-shadow(0 16px 22px rgba(249,115,22,.18)) !important;
+}
+
+:root[data-theme="light"] .donutTrack{
+  stroke:#ffedd5 !important;
+}
+
+:root[data-theme="light"] .donutTaken{
+  stroke:#22c55e !important;
+}
+
+:root[data-theme="light"] .donutSkipped{
+  stroke:#fb923c !important;
+}
+
+:root[data-theme="light"] .dashboardDonutCenter strong{
+  color:#f97316 !important;
+}
+
+:root[data-theme="light"] .dashboardDonutCenter span,
+:root[data-theme="light"] .pillarItem span{
+  color:#334155 !important;
+}
+
+:root[data-theme="light"] .dashboardPillarChart{
+  background:linear-gradient(180deg,#ffffff,#fff7ed) !important;
+  border:1px solid rgba(249,115,22,.18) !important;
+  box-shadow:0 18px 40px rgba(124,45,18,.10) !important;
+}
+
+:root[data-theme="light"] .pillarBarShell{
+  background:#fff1e6 !important;
+  border:1px solid rgba(249,115,22,.26) !important;
+}
+
+:root[data-theme="light"] .pillarPaid{
+  background:linear-gradient(180deg,#22c55e,#16a34a) !important;
+}
+
+:root[data-theme="light"] .pillarUnpaid{
+  background:linear-gradient(180deg,#fb923c,#f97316) !important;
+}
+
+:root[data-theme="light"] .dashboardLegend div,
+:root[data-theme="light"] .meal-item,
+:root[data-theme="light"] .ticketItem,
+:root[data-theme="light"] .ticket-card,
+:root[data-theme="light"] .summaryBox,
+:root[data-theme="light"] .infoBox,
+:root[data-theme="light"] .detailBox{
+  background:#ffffff !important;
+  color:#111827 !important;
+  border:1px solid rgba(249,115,22,.16) !important;
+  box-shadow:0 10px 24px rgba(124,45,18,.07) !important;
+}
+
+:root[data-theme="light"] .meal-item p,
+:root[data-theme="light"] .ticketItem p,
+:root[data-theme="light"] .dashboardLegend div,
+:root[data-theme="light"] .detailBox,
+:root[data-theme="light"] .infoBox{
+  color:#334155 !important;
+}
+
+:root[data-theme="light"] table,
+:root[data-theme="light"] .table{
+  background:#ffffff !important;
+  color:#111827 !important;
+  border-color:rgba(249,115,22,.16) !important;
+}
+
+:root[data-theme="light"] th{
+  background:linear-gradient(135deg,#ffedd5,#fff7ed) !important;
+  color:#9a3412 !important;
+}
+
+:root[data-theme="light"] td{
+  color:#1f2937 !important;
+  border-color:rgba(249,115,22,.12) !important;
+}
+
+:root[data-theme="light"] tr:hover td{
+  background:#fff7ed !important;
+}
+
+:root[data-theme="light"] .btnGreen,
+:root[data-theme="light"] .dashboardRefreshBtn,
+:root[data-theme="light"] button[type="submit"]{
+  background:linear-gradient(135deg,#22c55e,#16a34a) !important;
+  color:#ffffff !important;
+}
+
+:root[data-theme="light"] .btnBlue,
+:root[data-theme="light"] .btnPrimary,
+:root[data-theme="light"] .saveBtn{
+  background:linear-gradient(135deg,#38bdf8,#2563eb) !important;
+  color:#ffffff !important;
+}
+
+:root[data-theme="light"] .btnOrange,
+:root[data-theme="light"] .editBtn{
+  background:linear-gradient(135deg,#fb923c,#f97316) !important;
+  color:#ffffff !important;
+}
+
+:root[data-theme="light"] .logoutBtn,
+:root[data-theme="light"] .btnRed,
+:root[data-theme="light"] .deleteBtn{
+  background:linear-gradient(135deg,#fb7185,#ef4444) !important;
+  color:#ffffff !important;
+}
+
+:root[data-theme="light"] .authPage,
+:root[data-theme="light"] .loginPage,
+:root[data-theme="light"] .registerPage{
+  background:
+    radial-gradient(circle at top left,rgba(251,146,60,.20),transparent 28%),
+    radial-gradient(circle at bottom right,rgba(34,197,94,.12),transparent 26%),
+    linear-gradient(135deg,#fffaf3,#ffffff) !important;
+}
+
+:root[data-theme="light"] a{
+  color:#ea580c !important;
+}
+
+/* =========================================================
+   FINAL FIX: REMOVE ALL BLACK BLOCKS FROM LIGHT MODE
+   White + orange theme for every module. Dark mode untouched.
+   ========================================================= */
+:root[data-theme="light"]{
+  --bg:#fffaf5;
+  --bg-soft:#fff7ed;
+  --card:#ffffff;
+  --card-2:#fffaf3;
+  --panel:#ffffff;
+  --panel-strong:#ffedd5;
+  --text:#111827;
+  --text-soft:#475569;
+  --text-light:#111827;
+  --text-dark:#111827;
+  --border:rgba(249,115,22,.18);
+  --border-strong:rgba(249,115,22,.35);
+  --shadow:0 18px 45px rgba(124,45,18,.12);
+  --shadow-soft:0 10px 26px rgba(124,45,18,.09);
+}
+
+:root[data-theme="light"] body,
+:root[data-theme="light"] #root,
+:root[data-theme="light"] .appLayout,
+:root[data-theme="light"] .mainContent,
+:root[data-theme="light"] .page,
+:root[data-theme="light"] .dashboardPage,
+:root[data-theme="light"] .menuPage,
+:root[data-theme="light"] .inventoryPage,
+:root[data-theme="light"] .help-page,
+:root[data-theme="light"] .billingPage,
+:root[data-theme="light"] .attendancePage,
+:root[data-theme="light"] .complaintsPage,
+:root[data-theme="light"] .notificationsPage,
+:root[data-theme="light"] .usersPage,
+:root[data-theme="light"] .profilePage{
+  color:#111827 !important;
+  background:
+    radial-gradient(circle at top left,rgba(251,146,60,.20),transparent 28%),
+    radial-gradient(circle at top right,rgba(34,197,94,.10),transparent 26%),
+    linear-gradient(135deg,#fffaf5 0%,#fff7ed 42%,#ffffff 100%) !important;
+}
+
+/* Main white cards / sections */
+:root[data-theme="light"] .card,
+:root[data-theme="light"] .dashboardHeroCard,
+:root[data-theme="light"] .dashboardStatCard,
+:root[data-theme="light"] .dashboardChartCard,
+:root[data-theme="light"] .dashboardStudentCard,
+:root[data-theme="light"] .studentBillChartCard,
+:root[data-theme="light"] .profileCard,
+:root[data-theme="light"] .menuCard,
+:root[data-theme="light"] .weekly-form-card,
+:root[data-theme="light"] .menu-day-card,
+:root[data-theme="light"] .weeklyDisplayDay,
+:root[data-theme="light"] .menuListCard,
+:root[data-theme="light"] .inventory-card,
+:root[data-theme="light"] .inventory-summary-card,
+:root[data-theme="light"] .help-card,
+:root[data-theme="light"] .help-chat-card,
+:root[data-theme="light"] .admin-users-card,
+:root[data-theme="light"] .billing-card,
+:root[data-theme="light"] .complaint-card,
+:root[data-theme="light"] .notification-card,
+:root[data-theme="light"] .attendance-card,
+:root[data-theme="light"] .import-summary-card,
+:root[data-theme="light"] .authCard,
+:root[data-theme="light"] .auth-card,
+:root[data-theme="light"] .sectionCard,
+:root[data-theme="light"] .summaryCard,
+:root[data-theme="light"] .panel,
+:root[data-theme="light"] .box{
+  background:linear-gradient(180deg,#ffffff 0%,#fffaf3 100%) !important;
+  color:#111827 !important;
+  border:1px solid rgba(249,115,22,.18) !important;
+  box-shadow:0 18px 44px rgba(124,45,18,.11) !important;
+}
+
+/* Inner blocks that were still black */
+:root[data-theme="light"] .weeklyMealBlock,
+:root[data-theme="light"] .modernMealBlock,
+:root[data-theme="light"] .weeklyDisplayMeal,
+:root[data-theme="light"] .dashboardMenuDetails p,
+:root[data-theme="light"] .studentBillAmountGrid div,
+:root[data-theme="light"] .dashboardLegend div,
+:root[data-theme="light"] .dashboardPillarChart,
+:root[data-theme="light"] .pillarBarShell,
+:root[data-theme="light"] .meal-item,
+:root[data-theme="light"] .mealItem,
+:root[data-theme="light"] .ticketItem,
+:root[data-theme="light"] .ticket-card,
+:root[data-theme="light"] .help-ticket-item,
+:root[data-theme="light"] .summaryBox,
+:root[data-theme="light"] .infoBox,
+:root[data-theme="light"] .detailBox,
+:root[data-theme="light"] .statBox,
+:root[data-theme="light"] .billBox,
+:root[data-theme="light"] .statusBox,
+:root[data-theme="light"] .listItem,
+:root[data-theme="light"] .dataBox{
+  background:#ffffff !important;
+  color:#1f2937 !important;
+  border:1px solid rgba(249,115,22,.16) !important;
+  box-shadow:0 10px 24px rgba(124,45,18,.07) !important;
+}
+
+/* Any dark text/heading forced by old dark theme */
+:root[data-theme="light"] h1,
+:root[data-theme="light"] h2,
+:root[data-theme="light"] h3,
+:root[data-theme="light"] h4,
+:root[data-theme="light"] h5,
+:root[data-theme="light"] h6,
+:root[data-theme="light"] .dashboardHeroHeader h2,
+:root[data-theme="light"] .dashboardChartHead h3,
+:root[data-theme="light"] .dashboardStudentCard h3,
+:root[data-theme="light"] .weeklyDisplayDay h4,
+:root[data-theme="light"] .weeklyDisplayMeal strong,
+:root[data-theme="light"] .dashboardMenuDetails strong,
+:root[data-theme="light"] .pillarValue,
+:root[data-theme="light"] .brandTitle,
+:root[data-theme="light"] .title{
+  color:#111827 !important;
+}
+
+:root[data-theme="light"] p,
+:root[data-theme="light"] span,
+:root[data-theme="light"] small,
+:root[data-theme="light"] label,
+:root[data-theme="light"] .muted,
+:root[data-theme="light"] .dashboardHeroHeader .muted,
+:root[data-theme="light"] .dashboardChartHead p,
+:root[data-theme="light"] .dashboardChartHead .muted,
+:root[data-theme="light"] .dashboardMenuDetails p,
+:root[data-theme="light"] .weeklyDisplayMeal p,
+:root[data-theme="light"] .menuDayDate,
+:root[data-theme="light"] .pillarItem span,
+:root[data-theme="light"] .studentBillAmountGrid span,
+:root[data-theme="light"] .nextMealSummaryBox span{
+  color:#475569 !important;
+}
+
+:root[data-theme="light"] .dashboardStatCard strong,
+:root[data-theme="light"] .studentBillAmountGrid strong,
+:root[data-theme="light"] .nextMealSummaryBox strong,
+:root[data-theme="light"] .statValue{
+  color:#ea580c !important;
+}
+
+:root[data-theme="light"] .statGreen strong,
+:root[data-theme="light"] .paidText,
+:root[data-theme="light"] .successText{
+  color:#16a34a !important;
+}
+:root[data-theme="light"] .statRed strong,
+:root[data-theme="light"] .unpaidText,
+:root[data-theme="light"] .dangerText{
+  color:#ef4444 !important;
+}
+:root[data-theme="light"] .statBlue strong{
+  color:#0284c7 !important;
+}
+
+/* Form controls */
+:root[data-theme="light"] input,
+:root[data-theme="light"] select,
+:root[data-theme="light"] textarea,
+:root[data-theme="light"] .input,
+:root[data-theme="light"] .help-input,
+:root[data-theme="light"] .help-textarea,
+:root[data-theme="light"] input[type="date"],
+:root[data-theme="light"] input[type="month"]{
+  background:#ffffff !important;
+  color:#111827 !important;
+  border:1px solid rgba(148,163,184,.45) !important;
+  box-shadow:0 8px 18px rgba(124,45,18,.05) !important;
+}
+:root[data-theme="light"] select option{
+  background:#ffffff !important;
+  color:#111827 !important;
+}
+
+/* Tables */
+:root[data-theme="light"] table,
+:root[data-theme="light"] .table{
+  background:#ffffff !important;
+  color:#111827 !important;
+}
+:root[data-theme="light"] table th,
+:root[data-theme="light"] th{
+  background:linear-gradient(135deg,#ffedd5,#fff7ed) !important;
+  color:#9a3412 !important;
+  border-color:rgba(249,115,22,.16) !important;
+}
+:root[data-theme="light"] table td,
+:root[data-theme="light"] td{
+  background:#ffffff !important;
+  color:#1f2937 !important;
+  border-color:rgba(249,115,22,.12) !important;
+}
+
+/* Menu price and badges */
+:root[data-theme="light"] .badge,
+:root[data-theme="light"] .meal-badge,
+:root[data-theme="light"] .statusBadge,
+:root[data-theme="light"] .weeklyPriceTag{
+  background:#fff7ed !important;
+  color:#c2410c !important;
+  border:1px solid rgba(249,115,22,.28) !important;
+}
+
+/* Charts in light mode */
+:root[data-theme="light"] .dashboardDonutWrap{
+  background:linear-gradient(180deg,#ffffff,#fff7ed) !important;
+  border:1px solid rgba(249,115,22,.18) !important;
+  box-shadow:0 18px 42px rgba(124,45,18,.11) !important;
+}
+:root[data-theme="light"] .donutTrack{stroke:#ffedd5 !important;}
+:root[data-theme="light"] .donutTaken{stroke:#22c55e !important;}
+:root[data-theme="light"] .donutSkipped{stroke:#fb923c !important;}
+:root[data-theme="light"] .dashboardDonutCenter strong{color:#f97316 !important;}
+:root[data-theme="light"] .dashboardDonutCenter span{color:#334155 !important;}
+:root[data-theme="light"] .pillarBarShell{background:#fff1e6 !important;}
+:root[data-theme="light"] .pillarPaid{background:linear-gradient(180deg,#22c55e,#16a34a) !important;}
+:root[data-theme="light"] .pillarUnpaid{background:linear-gradient(180deg,#fb923c,#f97316) !important;}
+
+/* Header decorative circles should be soft, not black */
+:root[data-theme="light"] .dashboardHeroCard::before,
+:root[data-theme="light"] .dashboardStatCard::after,
+:root[data-theme="light"] .dashboardChartCard::before,
+:root[data-theme="light"] .menu-day-card::before{
+  background:linear-gradient(135deg,rgba(251,146,60,.18),rgba(34,197,94,.10)) !important;
+  opacity:1 !important;
+}
+
+/* Keep buttons attractive */
+:root[data-theme="light"] .dashboardRefreshBtn,
+:root[data-theme="light"] .btnGreen,
+:root[data-theme="light"] button[type="submit"]{
+  background:linear-gradient(135deg,#22c55e,#16a34a) !important;
+  color:#ffffff !important;
+}
+:root[data-theme="light"] .btnOrange,
+:root[data-theme="light"] .editBtn{
+  background:linear-gradient(135deg,#fb923c,#f97316) !important;
+  color:#ffffff !important;
+}
+:root[data-theme="light"] .btnBlue,
+:root[data-theme="light"] .saveBtn{
+  background:linear-gradient(135deg,#38bdf8,#2563eb) !important;
+  color:#ffffff !important;
+}
+:root[data-theme="light"] .btnRed,
+:root[data-theme="light"] .deleteBtn,
+:root[data-theme="light"] .logoutBtn{
+  background:linear-gradient(135deg,#fb7185,#ef4444) !important;
+  color:#ffffff !important;
+}
+
+/* =========================================================
+   LIGHT MODE COMPLETE WHITE FIX FOR PROFILE / HELP / MENU / INVENTORY
+   Removes remaining dark blocks only in light mode. Dark mode unchanged.
+   ========================================================= */
+:root[data-theme="light"] .profileCompactCard,
+:root[data-theme="light"] .help-centre-header,
+:root[data-theme="light"] .menuWeekStartCard,
+:root[data-theme="light"] .weeklyDayCard,
+:root[data-theme="light"] .modernWeeklyDayCard,
+:root[data-theme="light"] .weeklyDisplayCard,
+:root[data-theme="light"] .weekly-menu-page,
+:root[data-theme="light"] .weekly-menu-header,
+:root[data-theme="light"] .inventorySummaryBox,
+:root[data-theme="light"] .inventorySummaryWide,
+:root[data-theme="light"] .help-ticket-item,
+:root[data-theme="light"] .help-message,
+:root[data-theme="light"] .help-note-box,
+:root[data-theme="light"] .help-reply-box {
+  background: linear-gradient(180deg, #ffffff 0%, #fffaf3 100%) !important;
+  color: #111827 !important;
+  border: 1px solid rgba(249, 115, 22, 0.20) !important;
+  box-shadow: 0 16px 36px rgba(124, 45, 18, 0.10) !important;
+}
+
+:root[data-theme="light"] .profileCompactCard::before,
+:root[data-theme="light"] .profileCompactCard::after,
+:root[data-theme="light"] .help-centre-header::before,
+:root[data-theme="light"] .help-centre-header::after,
+:root[data-theme="light"] .weeklyDayCard::before,
+:root[data-theme="light"] .weeklyDayCard::after,
+:root[data-theme="light"] .modernWeeklyDayCard::before,
+:root[data-theme="light"] .modernWeeklyDayCard::after,
+:root[data-theme="light"] .inventorySummaryBox::before,
+:root[data-theme="light"] .inventorySummaryBox::after,
+:root[data-theme="light"] .menuWeekStartCard::before,
+:root[data-theme="light"] .menuWeekStartCard::after {
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.16), rgba(34, 197, 94, 0.08)) !important;
+  opacity: 1 !important;
+}
+
+:root[data-theme="light"] .weeklyMealBlock,
+:root[data-theme="light"] .modernMealBlock,
+:root[data-theme="light"] .meal-list .meal-item,
+:root[data-theme="light"] .meal-title-row,
+:root[data-theme="light"] .weeklyDisplayMeal,
+:root[data-theme="light"] .weeklyDisplayWrap,
+:root[data-theme="light"] .weekly-menu-grid .menu-day-card,
+:root[data-theme="light"] .inventorySummaryGrid .inventorySummaryBox,
+:root[data-theme="light"] .help-ticket-list .help-ticket-item,
+:root[data-theme="light"] .help-messages,
+:root[data-theme="light"] .help-message.admin,
+:root[data-theme="light"] .help-message.user,
+:root[data-theme="light"] .profileCompactGrid,
+:root[data-theme="light"] .profileField {
+  background: #ffffff !important;
+  color: #1f2937 !important;
+  border-color: rgba(249, 115, 22, 0.16) !important;
+}
+
+:root[data-theme="light"] .profileCompactTitle,
+:root[data-theme="light"] .help-centre-header h1,
+:root[data-theme="light"] .help-centre-header h2,
+:root[data-theme="light"] .help-card h2,
+:root[data-theme="light"] .help-card h3,
+:root[data-theme="light"] .weekly-menu-title,
+:root[data-theme="light"] .weeklyDisplayHeader h3,
+:root[data-theme="light"] .weeklyDayCardHeader strong,
+:root[data-theme="light"] .weeklyDayCardHeader h3,
+:root[data-theme="light"] .menuDayName,
+:root[data-theme="light"] .inventorySummaryBox strong,
+:root[data-theme="light"] .inventorySummaryBox b,
+:root[data-theme="light"] .inventorySummaryBox h3,
+:root[data-theme="light"] .inventorySummaryBox .value,
+:root[data-theme="light"] .help-ticket-item h4,
+:root[data-theme="light"] .help-ticket-item strong,
+:root[data-theme="light"] .help-ticket-row strong {
+  color: #111827 !important;
+}
+
+:root[data-theme="light"] .profileCompactSubtitle,
+:root[data-theme="light"] .profileLabel,
+:root[data-theme="light"] .help-centre-header p,
+:root[data-theme="light"] .help-muted,
+:root[data-theme="light"] .help-ticket-meta,
+:root[data-theme="light"] .help-ticket-user,
+:root[data-theme="light"] .weekly-menu-subtitle,
+:root[data-theme="light"] .weekly-menu-updated,
+:root[data-theme="light"] .menuDayDate,
+:root[data-theme="light"] .inventorySummaryTitle,
+:root[data-theme="light"] .inventoryLabel,
+:root[data-theme="light"] .menuLabel {
+  color: #475569 !important;
+}
+
+:root[data-theme="light"] .profileAvatarMini,
+:root[data-theme="light"] .weeklyDayBadge,
+:root[data-theme="light"] .menu-day-dot {
+  background: linear-gradient(135deg, #fb923c, #f97316) !important;
+  color: #ffffff !important;
+  border: 3px solid #ffedd5 !important;
+  box-shadow: 0 10px 24px rgba(249, 115, 22, 0.22) !important;
+}
+
+:root[data-theme="light"] .formMealBadge,
+:root[data-theme="light"] .meal-badge,
+:root[data-theme="light"] .weeklyPriceTag,
+:root[data-theme="light"] .meal-price,
+:root[data-theme="light"] .help-badge,
+:root[data-theme="light"] .inventoryStatusBadge {
+  background: #fff7ed !important;
+  color: #c2410c !important;
+  border: 1px solid rgba(249, 115, 22, 0.25) !important;
+}
+
+:root[data-theme="light"] .formMealBadge.lunch,
+:root[data-theme="light"] .meal-badge.lunch,
+:root[data-theme="light"] .inventoryStatusBadge.ok,
+:root[data-theme="light"] .help-badge.open {
+  background: #ecfdf5 !important;
+  color: #15803d !important;
+  border-color: rgba(34, 197, 94, 0.28) !important;
+}
+
+:root[data-theme="light"] .formMealBadge.dinner,
+:root[data-theme="light"] .meal-badge.dinner {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border-color: rgba(148, 163, 184, 0.28) !important;
+}
+
+:root[data-theme="light"] .profileInputCompact,
+:root[data-theme="light"] .profileInputDisabled,
+:root[data-theme="light"] .compactInput,
+:root[data-theme="light"] .menuSearchInput,
+:root[data-theme="light"] .help-input,
+:root[data-theme="light"] .help-textarea {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid rgba(148, 163, 184, 0.42) !important;
+  box-shadow: 0 8px 18px rgba(124, 45, 18, 0.05) !important;
+}
+
+:root[data-theme="light"] .profileInputDisabled {
+  background: #f8fafc !important;
+  color: #475569 !important;
+}
+
+:root[data-theme="light"] .inventorySummaryBox span,
+:root[data-theme="light"] .inventorySummaryBox .inventorySummaryTitle {
+  color: #64748b !important;
+}
+
+:root[data-theme="light"] .inventorySummaryBox div,
+:root[data-theme="light"] .inventorySummaryBox strong,
+:root[data-theme="light"] .inventorySummaryBox .inventorySummaryValue {
+  color: #ea580c !important;
+}
+
+:root[data-theme="light"] .help-btn.primary,
+:root[data-theme="light"] .profileSaveBtnCompact {
+  background: linear-gradient(135deg, #fb923c, #f97316) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 12px 24px rgba(249, 115, 22, 0.24) !important;
+}
+
+:root[data-theme="light"] .help-btn.secondary {
+  background: linear-gradient(135deg, #38bdf8, #2563eb) !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+:root[data-theme="light"] .help-btn.danger {
+  background: linear-gradient(135deg, #fb7185, #ef4444) !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+/* =========================================================
+   FINAL BILLING PAYMENT MODAL LIGHT MODE FIX
+   Paste at the VERY END of styles.css. Dark mode remains unchanged.
+   This targets your real modal classes: qrModalOverlay, qrModalCard,
+   billingQrModalCard, qrPreviewCard, billingQrLayout, etc.
+   ========================================================= */
+
+:root[data-theme="light"] .qrModalOverlay{
+  background:rgba(15, 23, 42, 0.38) !important;
+  backdrop-filter:blur(6px) !important;
+  -webkit-backdrop-filter:blur(6px) !important;
+}
+
+:root[data-theme="light"] .qrModalCard,
+:root[data-theme="light"] .billingQrModalCard,
+:root[data-theme="light"] .qrModalCardSmall{
+  background:linear-gradient(180deg,#ffffff 0%,#fffaf3 100%) !important;
+  color:#111827 !important;
+  border:1px solid rgba(249,115,22,0.24) !important;
+  box-shadow:0 30px 80px rgba(124,45,18,0.22) !important;
+}
+
+:root[data-theme="light"] .qrModalCard *,
+:root[data-theme="light"] .billingQrModalCard *{
+  color:inherit;
+}
+
+:root[data-theme="light"] .qrTitle,
+:root[data-theme="light"] .billingQrModalCard h1,
+:root[data-theme="light"] .billingQrModalCard h2,
+:root[data-theme="light"] .billingQrModalCard h3,
+:root[data-theme="light"] .qrModalCard h1,
+:root[data-theme="light"] .qrModalCard h2,
+:root[data-theme="light"] .qrModalCard h3{
+  color:#111827 !important;
+}
+
+:root[data-theme="light"] .qrAmountText,
+:root[data-theme="light"] .qrInfoText,
+:root[data-theme="light"] .qrInfoText p,
+:root[data-theme="light"] .qrFormSection label,
+:root[data-theme="light"] .billingQrModalCard label,
+:root[data-theme="light"] .billingQrModalCard p,
+:root[data-theme="light"] .billingQrModalCard span,
+:root[data-theme="light"] .upiLinkBox label{
+  color:#475569 !important;
+}
+
+:root[data-theme="light"] .billingQrLayout,
+:root[data-theme="light"] .billingQrLeft,
+:root[data-theme="light"] .billingQrRight,
+:root[data-theme="light"] .qrFormSection,
+:root[data-theme="light"] .upiLinkBox{
+  background:transparent !important;
+  color:#111827 !important;
+  border:none !important;
+  box-shadow:none !important;
+}
+
+:root[data-theme="light"] .qrPreviewCard{
+  background:linear-gradient(180deg,#ffffff 0%,#fff7ed 100%) !important;
+  color:#111827 !important;
+  border:1px solid rgba(249,115,22,0.22) !important;
+  box-shadow:0 16px 35px rgba(124,45,18,0.11) !important;
+}
+
+:root[data-theme="light"] .qrImage,
+:root[data-theme="light"] .qrImageSmall{
+  background:#ffffff !important;
+  border:1px solid rgba(249,115,22,0.22) !important;
+  box-shadow:0 10px 24px rgba(124,45,18,0.10) !important;
+}
+
+:root[data-theme="light"] .billingQrModalCard input,
+:root[data-theme="light"] .billingQrModalCard textarea,
+:root[data-theme="light"] .billingQrModalCard select,
+:root[data-theme="light"] .qrModalCard input,
+:root[data-theme="light"] .qrModalCard textarea,
+:root[data-theme="light"] .qrModalCard select,
+:root[data-theme="light"] .billingFileInput,
+:root[data-theme="light"] .upiLinkBox textarea{
+  background:#ffffff !important;
+  color:#111827 !important;
+  border:1px solid rgba(148,163,184,0.45) !important;
+  box-shadow:0 8px 18px rgba(124,45,18,0.05) !important;
+}
+
+:root[data-theme="light"] .billingQrModalCard input:focus,
+:root[data-theme="light"] .billingQrModalCard textarea:focus,
+:root[data-theme="light"] .billingQrModalCard select:focus,
+:root[data-theme="light"] .qrModalCard input:focus,
+:root[data-theme="light"] .qrModalCard textarea:focus,
+:root[data-theme="light"] .qrModalCard select:focus{
+  border-color:#fb923c !important;
+  box-shadow:0 0 0 4px rgba(251,146,60,0.18) !important;
+  outline:none !important;
+}
+
+:root[data-theme="light"] .billingFileInput,
+:root[data-theme="light"] input[type="file"].billingFileInput{
+  background:#fff7ed !important;
+  color:#111827 !important;
+  border:1px solid rgba(249,115,22,0.24) !important;
+  border-radius:14px !important;
+}
+
+:root[data-theme="light"] .billingQrButtonRow .btn,
+:root[data-theme="light"] .qrButtonRow .btn,
+:root[data-theme="light"] .billingQrModalCard .btn,
+:root[data-theme="light"] .qrModalCard .btn{
+  border:none !important;
+  color:#ffffff !important;
+  box-shadow:0 12px 26px rgba(124,45,18,0.14) !important;
+}
+
+:root[data-theme="light"] .billingQrButtonRow .btnBlue,
+:root[data-theme="light"] .qrButtonRow .btnBlue,
+:root[data-theme="light"] .billingQrModalCard .btnBlue,
+:root[data-theme="light"] .qrModalCard .btnBlue{
+  background:linear-gradient(135deg,#fb923c,#f97316) !important;
+  color:#ffffff !important;
+}
+
+:root[data-theme="light"] .billingQrButtonRow .btnRed,
+:root[data-theme="light"] .qrButtonRow .btnRed,
+:root[data-theme="light"] .billingQrModalCard .btnRed,
+:root[data-theme="light"] .qrModalCard .btnRed{
+  background:linear-gradient(135deg,#fb7185,#ef4444) !important;
+  color:#ffffff !important;
+}
+
+:root[data-theme="light"] .billingQrModalCard .btnGreen,
+:root[data-theme="light"] .qrModalCard .btnGreen{
+  background:linear-gradient(135deg,#22c55e,#16a34a) !important;
+  color:#ffffff !important;
+}
+
+:root[data-theme="light"] .billingQrModalCard .btn:hover,
+:root[data-theme="light"] .qrModalCard .btn:hover{
+  transform:translateY(-2px) !important;
+  box-shadow:0 16px 30px rgba(249,115,22,0.24) !important;
+}
+
+:root[data-theme="light"] .billingQrModalCard .row,
+:root[data-theme="light"] .qrModalCard .row{
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+}
+
+/* Pay by UPI / Pay by Cash tab buttons inside the modal */
+:root[data-theme="light"] .billingQrModalCard .row > button,
+:root[data-theme="light"] .qrModalCard .row > button{
+  background:#fff7ed !important;
+  color:#9a3412 !important;
+  border:1px solid rgba(249,115,22,0.28) !important;
+  box-shadow:0 8px 20px rgba(124,45,18,0.08) !important;
+}
+
+:root[data-theme="light"] .billingQrModalCard .row > button:first-child,
+:root[data-theme="light"] .qrModalCard .row > button:first-child,
+:root[data-theme="light"] .billingQrModalCard .row > button.active,
+:root[data-theme="light"] .qrModalCard .row > button.active{
+  background:linear-gradient(135deg,#fb923c,#f97316) !important;
+  color:#ffffff !important;
+  border-color:transparent !important;
+}
+
+
+/* =========================================================
+   FINAL DASHBOARD GRAPH COLOR SYNC - LIGHT MODE
+   Teal + Lavender graph design like sample image
+   Put this at END of styles.css
+   ========================================================= */
+:root[data-theme="light"] .dashboardChartCard.dashboard-graph-card,
+:root[data-theme="light"] .studentBillChartCard.dashboard-graph-card{
+  background:
+    radial-gradient(circle at bottom right, rgba(167, 139, 250, 0.24), transparent 30%),
+    radial-gradient(circle at bottom left, rgba(45, 212, 191, 0.18), transparent 28%),
+    linear-gradient(135deg, #ffffff 0%, #fffefa 52%, #f8fbff 100%) !important;
+  border: 1px solid #e9d5ff !important;
+  box-shadow: 0 20px 48px rgba(124, 58, 237, 0.13) !important;
+  color: #111827 !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+:root[data-theme="light"] .dashboardChartCard.dashboard-graph-card::before,
+:root[data-theme="light"] .studentBillChartCard.dashboard-graph-card::before{
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  border-radius: 0 !important;
+  background-image: radial-gradient(#d8b4fe 1px, transparent 1px) !important;
+  background-size: 14px 14px !important;
+  background-color: transparent !important;
+  opacity: 0.20 !important;
+  pointer-events: none !important;
+}
+
+:root[data-theme="light"] .dashboardChartCard.dashboard-graph-card > *,
+:root[data-theme="light"] .studentBillChartCard.dashboard-graph-card > *{
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+:root[data-theme="light"] .dashboardChartCard.dashboard-graph-card h3,
+:root[data-theme="light"] .studentBillChartCard.dashboard-graph-card h3{
+  color: #111827 !important;
+}
+
+:root[data-theme="light"] .dashboardChartCard.dashboard-graph-card p,
+:root[data-theme="light"] .dashboardChartCard.dashboard-graph-card .muted,
+:root[data-theme="light"] .studentBillChartCard.dashboard-graph-card p,
+:root[data-theme="light"] .studentBillChartCard.dashboard-graph-card .muted{
+  color: #475569 !important;
+}
+
+:root[data-theme="light"] .graph-icon-box{
+  width: 72px !important;
+  height: 72px !important;
+  border-radius: 18px !important;
+  background: linear-gradient(135deg, #ecfdf5, #ccfbf1) !important;
+  border: 1px solid #99f6e4 !important;
+  box-shadow: 0 12px 30px rgba(20, 184, 166, 0.18) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #0f766e !important;
+  font-size: 32px !important;
+}
+
+:root[data-theme="light"] .dashboardChartCard.dashboard-graph-card .badge{
+  background: #f5f3ff !important;
+  color: #7c3aed !important;
+  border: 1px solid #ddd6fe !important;
+}
+
+/* Donut graph: graph colors and legend colors now match */
+:root[data-theme="light"] .dashboardDonutWrap{
+  background: linear-gradient(135deg, #ffffff, #fff7ed) !important;
+  border: 1px solid #fed7aa !important;
+  box-shadow: 0 18px 40px rgba(124, 58, 237, 0.12) !important;
+}
+
+:root[data-theme="light"] .dashboardDonut{
+  filter: drop-shadow(0 16px 24px rgba(124, 58, 237, 0.16)) !important;
+}
+
+:root[data-theme="light"] .donutTrack{
+  stroke: #eef2ff !important;
+}
+
+:root[data-theme="light"] .donutTaken{
+  stroke: #34d399 !important;
+}
+
+:root[data-theme="light"] .donutSkipped{
+  stroke: #a78bfa !important;
+}
+
+:root[data-theme="light"] .donutVariant-bill .donutTaken{
+  stroke: #2dd4bf !important;
+}
+
+:root[data-theme="light"] .donutVariant-bill .donutSkipped{
+  stroke: #8b5cf6 !important;
+}
+
+:root[data-theme="light"] .dashboardDonutCenter strong{
+  color: #0891b2 !important;
+}
+
+:root[data-theme="light"] .donutVariant-bill .dashboardDonutCenter strong{
+  color: #7c3aed !important;
+}
+
+:root[data-theme="light"] .dashboardDonutCenter span{
+  color: #334155 !important;
+}
+
+/* Bill bar graph: paid and unpaid colors match detail boxes */
+:root[data-theme="light"] .dashboardPillarChart{
+  background: rgba(255, 255, 255, 0.72) !important;
+  border: 1px solid #ddd6fe !important;
+  box-shadow: 0 14px 34px rgba(124, 58, 237, 0.10) !important;
+}
+
+:root[data-theme="light"] .pillarGridLines span{
+  background: #e9d5ff !important;
+  opacity: .85 !important;
+}
+
+:root[data-theme="light"] .pillarValue{
+  color: #111827 !important;
+}
+
+:root[data-theme="light"] .pillarBarShell{
+  background: linear-gradient(180deg, #ffffff, #f5f3ff) !important;
+  border: 1px solid #ddd6fe !important;
+  box-shadow: inset 0 0 0 5px rgba(167, 139, 250, 0.08) !important;
+}
+
+:root[data-theme="light"] .pillarPaid{
+  background: linear-gradient(180deg, #34d399 0%, #14b8a6 100%) !important;
+}
+
+:root[data-theme="light"] .pillarUnpaid{
+  background: linear-gradient(180deg, #c084fc 0%, #8b5cf6 100%) !important;
+}
+
+:root[data-theme="light"] .pillarItem span{
+  color: #334155 !important;
+}
+
+/* Legends / detail boxes: same colors as graph */
+:root[data-theme="light"] .dashboardLegend div{
+  background: rgba(255, 255, 255, 0.86) !important;
+  border: 1px solid #ddd6fe !important;
+  color: #111827 !important;
+  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.08) !important;
+}
+
+.legendTeal,
+:root[data-theme="light"] .legendTeal,
+:root[data-theme="light"] .legendGreen,
+:root[data-theme="light"] .legendBlue{
+  background: #34d399 !important;
+}
+
+.legendPurple,
+:root[data-theme="light"] .legendPurple,
+:root[data-theme="light"] .legendRed,
+:root[data-theme="light"] .legendOrange{
+  background: #a78bfa !important;
+}
+
+:root[data-theme="light"] .studentBillAmountGrid div{
+  background: rgba(255, 255, 255, 0.86) !important;
+  border: 1px solid #ddd6fe !important;
+  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.08) !important;
+}
+
+:root[data-theme="light"] .studentBillAmountGrid strong{
+  color: #7c3aed !important;
+}
+
+
+/* ===== PROFILE PAGE - LIGHT MODE ATTRACTIVE DESIGN ===== */
+
+:root[data-theme="light"] .profilePageWrap {
+  min-height: calc(100vh - 90px) !important;
+  padding: 42px 18px !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  background:
+    radial-gradient(circle at top left, rgba(251, 146, 60, 0.16), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(45, 212, 191, 0.14), transparent 30%),
+    linear-gradient(135deg, #fff7ed, #ffffff 45%, #f0fdfa) !important;
+}
+
+:root[data-theme="light"] .profileCard,
+:root[data-theme="light"] .profile-card,
+:root[data-theme="light"] .profile-card-modern,
+:root[data-theme="light"] .profilePageWrap .card {
+  width: 100% !important;
+  max-width: 780px !important;
+  padding: 34px !important;
+  border-radius: 30px !important;
+  background:
+    radial-gradient(circle at top right, rgba(251, 146, 60, 0.18), transparent 24%),
+    linear-gradient(135deg, #ffffff, #fffaf5) !important;
+  border: 1px solid #fed7aa !important;
+  box-shadow: 0 24px 55px rgba(249, 115, 22, 0.16) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+:root[data-theme="light"] .profileCard::before,
+:root[data-theme="light"] .profile-card::before,
+:root[data-theme="light"] .profile-card-modern::before,
+:root[data-theme="light"] .profilePageWrap .card::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  background-image: radial-gradient(#fdba74 1px, transparent 1px) !important;
+  background-size: 16px 16px !important;
+  opacity: 0.16 !important;
+  pointer-events: none !important;
+}
+
+:root[data-theme="light"] .profileCard > *,
+:root[data-theme="light"] .profile-card > *,
+:root[data-theme="light"] .profile-card-modern > *,
+:root[data-theme="light"] .profilePageWrap .card > * {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+:root[data-theme="light"] .profileCard h1,
+:root[data-theme="light"] .profileCard h2,
+:root[data-theme="light"] .profile-card h1,
+:root[data-theme="light"] .profile-card h2,
+:root[data-theme="light"] .profile-card-modern h1,
+:root[data-theme="light"] .profile-card-modern h2,
+:root[data-theme="light"] .profilePageWrap .card h1,
+:root[data-theme="light"] .profilePageWrap .card h2 {
+  color: #111827 !important;
+  font-size: 32px !important;
+  font-weight: 900 !important;
+  margin-bottom: 6px !important;
+}
+
+:root[data-theme="light"] .profileCard p,
+:root[data-theme="light"] .profile-card p,
+:root[data-theme="light"] .profile-card-modern p,
+:root[data-theme="light"] .profileCard .muted,
+:root[data-theme="light"] .profile-card .muted,
+:root[data-theme="light"] .profile-card-modern .muted,
+:root[data-theme="light"] .profilePageWrap .card p,
+:root[data-theme="light"] .profilePageWrap .card .muted {
+  color: #64748b !important;
+  font-weight: 600 !important;
+}
+
+:root[data-theme="light"] .profileAvatar,
+:root[data-theme="light"] .profile-avatar,
+:root[data-theme="light"] .profileInitial,
+:root[data-theme="light"] .profile-initial {
+  width: 64px !important;
+  height: 64px !important;
+  border-radius: 20px !important;
+  background: linear-gradient(135deg, #fb923c, #f97316) !important;
+  color: white !important;
+  font-size: 28px !important;
+  font-weight: 900 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 14px 28px rgba(249, 115, 22, 0.28) !important;
+}
+
+:root[data-theme="light"] .profileCard label,
+:root[data-theme="light"] .profile-card label,
+:root[data-theme="light"] .profile-card-modern label,
+:root[data-theme="light"] .profilePageWrap .card label {
+  color: #334155 !important;
+  font-weight: 800 !important;
+  font-size: 14px !important;
+}
+
+:root[data-theme="light"] .profileCard input,
+:root[data-theme="light"] .profile-card input,
+:root[data-theme="light"] .profile-card-modern input,
+:root[data-theme="light"] .profilePageWrap .card input {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #111827 !important;
+  border-radius: 16px !important;
+  padding: 14px 16px !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04) !important;
+}
+
+:root[data-theme="light"] .profileCard input:focus,
+:root[data-theme="light"] .profile-card input:focus,
+:root[data-theme="light"] .profile-card-modern input:focus,
+:root[data-theme="light"] .profilePageWrap .card input:focus {
+  border-color: #fb923c !important;
+  box-shadow: 0 0 0 4px rgba(251, 146, 60, 0.18) !important;
+  outline: none !important;
+}
+
+:root[data-theme="light"] .profileCard input:disabled,
+:root[data-theme="light"] .profile-card input:disabled,
+:root[data-theme="light"] .profile-card-modern input:disabled,
+:root[data-theme="light"] .profilePageWrap .card input:disabled {
+  background: #f8fafc !important;
+  color: #64748b !important;
+}
+
+:root[data-theme="light"] .profileCard .btn,
+:root[data-theme="light"] .profile-card .btn,
+:root[data-theme="light"] .profile-card-modern .btn,
+:root[data-theme="light"] .profilePageWrap .card .btn {
+  background: linear-gradient(135deg, #fb923c, #f97316) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 16px !important;
+  padding: 14px 26px !important;
+  font-weight: 900 !important;
+  box-shadow: 0 14px 28px rgba(249, 115, 22, 0.25) !important;
+}
+
+:root[data-theme="light"] .profileCard .btn:hover,
+:root[data-theme="light"] .profile-card .btn:hover,
+:root[data-theme="light"] .profile-card-modern .btn:hover,
+:root[data-theme="light"] .profilePageWrap .card .btn:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 18px 34px rgba(249, 115, 22, 0.32) !important;
+}
+
+/* ========================================
+   PROFILE PAGE - MODERN LIGHT MODE
+======================================== */
+
+:root[data-theme="light"] .profilePageWrap{
+  min-height:calc(100vh - 90px);
+  padding:50px 20px;
+  display:flex;
+  justify-content:center;
+  align-items:flex-start;
+
+  background:
+    radial-gradient(circle at top left,
+      rgba(251,146,60,0.18),
+      transparent 26%),
+    radial-gradient(circle at bottom right,
+      rgba(45,212,191,0.16),
+      transparent 30%),
+    linear-gradient(135deg,#fff7ed,#ffffff 50%,#f0fdfa);
+}
+
+/* MAIN PROFILE CARD */
+:root[data-theme="light"] .profileCard,
+:root[data-theme="light"] .profile-card{
+  width:100%;
+  max-width:860px;
+
+  position:relative;
+  overflow:hidden;
+
+  border-radius:34px;
+
+  padding:42px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255,255,255,0.96),
+      rgba(255,250,245,0.98)
+    );
+
+  border:1px solid #fed7aa;
+
+  box-shadow:
+    0 30px 70px rgba(249,115,22,0.14),
+    0 10px 30px rgba(15,23,42,0.06);
+}
+
+/* GLOW EFFECT */
+:root[data-theme="light"] .profileCard::before,
+:root[data-theme="light"] .profile-card::before{
+  content:"";
+
+  position:absolute;
+  top:-120px;
+  right:-120px;
+
+  width:280px;
+  height:280px;
+
+  border-radius:50%;
+
+  background:rgba(251,146,60,0.12);
+
+  filter:blur(10px);
+}
+
+/* CONTENT */
+:root[data-theme="light"] .profileCard > *,
+:root[data-theme="light"] .profile-card > *{
+  position:relative;
+  z-index:2;
+}
+
+/* TITLE */
+:root[data-theme="light"] .profileCard h1,
+:root[data-theme="light"] .profileCard h2,
+:root[data-theme="light"] .profile-card h1,
+:root[data-theme="light"] .profile-card h2{
+  color:#0f172a !important;
+
+  font-size:42px;
+  font-weight:900;
+
+  margin-bottom:8px;
+
+  letter-spacing:-1px;
+}
+
+/* SUBTITLE */
+:root[data-theme="light"] .profileCard p,
+:root[data-theme="light"] .profile-card p{
+  color:#64748b !important;
+
+  font-size:15px;
+  font-weight:600;
+
+  margin-bottom:24px;
+}
+
+/* PROFILE AVATAR */
+:root[data-theme="light"] .profileAvatar,
+:root[data-theme="light"] .profile-avatar{
+  width:78px;
+  height:78px;
+
+  border-radius:24px;
+
+  background:
+    linear-gradient(135deg,#fb923c,#f97316);
+
+  color:#ffffff;
+
+  font-size:34px;
+  font-weight:900;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  box-shadow:
+    0 18px 36px rgba(249,115,22,0.28);
+
+  position:absolute;
+  top:34px;
+  right:34px;
+}
+
+/* FORM GRID */
+:root[data-theme="light"] .profileFormGrid{
+  display:grid;
+
+  grid-template-columns:1fr 1fr;
+
+  gap:24px;
+}
+
+/* LABELS */
+:root[data-theme="light"] .profileCard label,
+:root[data-theme="light"] .profile-card label{
+  display:block;
+
+  margin-bottom:8px;
+
+  color:#334155 !important;
+
+  font-size:14px;
+  font-weight:800;
+}
+
+/* INPUTS */
+:root[data-theme="light"] .profileCard input,
+:root[data-theme="light"] .profile-card input{
+  width:100%;
+
+  background:#ffffff !important;
+
+  border:1px solid #dbe4ee !important;
+
+  border-radius:18px !important;
+
+  padding:16px 18px !important;
+
+  font-size:15px;
+
+  color:#0f172a !important;
+
+  transition:all .25s ease;
+
+  box-shadow:
+    0 8px 18px rgba(15,23,42,0.04);
+}
+
+/* INPUT FOCUS */
+:root[data-theme="light"] .profileCard input:focus,
+:root[data-theme="light"] .profile-card input:focus{
+  border-color:#fb923c !important;
+
+  box-shadow:
+    0 0 0 5px rgba(251,146,60,0.18);
+
+  transform:translateY(-1px);
+
+  outline:none !important;
+}
+
+/* DISABLED */
+:root[data-theme="light"] .profileCard input:disabled,
+:root[data-theme="light"] .profile-card input:disabled{
+  background:#f8fafc !important;
+
+  color:#94a3b8 !important;
+}
+
+/* SUCCESS MESSAGE */
+:root[data-theme="light"] .profile-success{
+  padding:14px 18px;
+
+  border-radius:18px;
+
+  background:#ecfdf5;
+
+  border:1px solid #86efac;
+
+  color:#15803d;
+
+  font-weight:700;
+
+  margin-bottom:22px;
+}
+
+/* BUTTON */
+:root[data-theme="light"] .profileCard .btn,
+:root[data-theme="light"] .profile-card .btn{
+  margin-top:10px;
+
+  background:
+    linear-gradient(135deg,#fb923c,#f97316) !important;
+
+  color:#ffffff !important;
+
+  border:none !important;
+
+  border-radius:18px !important;
+
+  padding:16px 28px !important;
+
+  font-size:16px !important;
+  font-weight:900 !important;
+
+  box-shadow:
+    0 18px 34px rgba(249,115,22,0.26);
+
+  transition:all .25s ease;
+}
+
+/* BUTTON HOVER */
+:root[data-theme="light"] .profileCard .btn:hover,
+:root[data-theme="light"] .profile-card .btn:hover{
+  transform:translateY(-3px);
+
+  box-shadow:
+    0 24px 42px rgba(249,115,22,0.34);
+}
+
+/* MOBILE */
+@media(max-width:768px){
+
+  :root[data-theme="light"] .profileCard,
+  :root[data-theme="light"] .profile-card{
+    padding:28px;
+    border-radius:26px;
+  }
+
+  :root[data-theme="light"] .profileFormGrid{
+    grid-template-columns:1fr;
+    gap:18px;
+  }
+
+  :root[data-theme="light"] .profileAvatar,
+  :root[data-theme="light"] .profile-avatar{
+    position:static;
+    margin-bottom:20px;
+  }
+
+  :root[data-theme="light"] .profileCard h1,
+  :root[data-theme="light"] .profileCard h2,
+  :root[data-theme="light"] .profile-card h1,
+  :root[data-theme="light"] .profile-card h2{
+    font-size:32px;
+  }
+}
+
+/* ========================================
+   PROFILE PAGE - MODERN LIGHT MODE
+   ADAPTED FOR EXISTING PROJECT CLASSES
+   These selectors match your current Profile.jsx classes:
+   .profileCompactCard, .profileCompactHeader,
+   .profileCompactTitle, .profileCompactSubtitle,
+   .profileAvatarMini, .profileCompactGrid,
+   .profileField, .profileAlertSuccess
+======================================== */
+
+:root[data-theme="light"] .profilePageWrap{
+  min-height:calc(100vh - 90px) !important;
+  padding:50px 20px !important;
+  display:flex !important;
+  justify-content:center !important;
+  align-items:flex-start !important;
+  background:
+    radial-gradient(circle at top left, rgba(251,146,60,0.18), transparent 26%),
+    radial-gradient(circle at bottom right, rgba(45,212,191,0.16), transparent 30%),
+    linear-gradient(135deg,#fff7ed,#ffffff 50%,#f0fdfa) !important;
+}
+
+:root[data-theme="light"] .profileCompactCard{
+  width:100% !important;
+  max-width:860px !important;
+  position:relative !important;
+  overflow:hidden !important;
+  border-radius:34px !important;
+  padding:42px !important;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.96), rgba(255,250,245,0.98)) !important;
+  border:1px solid #fed7aa !important;
+  box-shadow:
+    0 30px 70px rgba(249,115,22,0.14),
+    0 10px 30px rgba(15,23,42,0.06) !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
+
+:root[data-theme="light"] .profileCompactCard::before{
+  content:"" !important;
+  position:absolute !important;
+  top:-120px !important;
+  right:-120px !important;
+  left:auto !important;
+  bottom:auto !important;
+  width:280px !important;
+  height:280px !important;
+  border-radius:50% !important;
+  background:rgba(251,146,60,0.12) !important;
+  filter:blur(10px) !important;
+  pointer-events:none !important;
+}
+
+:root[data-theme="light"] .profileCompactCard::after{
+  content:"";
+  position:absolute;
+  left:-90px;
+  bottom:-90px;
+  width:240px;
+  height:240px;
+  border-radius:50%;
+  background:rgba(45,212,191,0.12);
+  filter:blur(14px);
+  pointer-events:none;
+}
+
+:root[data-theme="light"] .profileCompactCard > *{
+  position:relative !important;
+  z-index:2 !important;
+}
+
+:root[data-theme="light"] .profileCompactHeader{
+  display:flex !important;
+  align-items:flex-start !important;
+  justify-content:space-between !important;
+  gap:22px !important;
+  margin-bottom:24px !important;
+}
+
+:root[data-theme="light"] .profileCompactTitle{
+  color:#0f172a !important;
+  font-size:42px !important;
+  font-weight:900 !important;
+  margin:0 0 8px !important;
+  letter-spacing:-1px !important;
+}
+
+:root[data-theme="light"] .profileCompactSubtitle{
+  color:#64748b !important;
+  font-size:15px !important;
+  font-weight:600 !important;
+  margin:0 !important;
+}
+
+:root[data-theme="light"] .profileAvatarMini{
+  width:78px !important;
+  height:78px !important;
+  min-width:78px !important;
+  border-radius:24px !important;
+  background:linear-gradient(135deg,#fb923c,#f97316) !important;
+  color:#ffffff !important;
+  font-size:34px !important;
+  font-weight:900 !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  box-shadow:0 18px 36px rgba(249,115,22,0.28) !important;
+}
+
+:root[data-theme="light"] .profileAlertSuccess,
+:root[data-theme="light"] .profile-success{
+  padding:14px 18px !important;
+  border-radius:18px !important;
+  background:#ecfdf5 !important;
+  border:1px solid #86efac !important;
+  color:#15803d !important;
+  font-weight:800 !important;
+  margin-bottom:22px !important;
+}
+
+:root[data-theme="light"] .profileAlertError{
+  padding:14px 18px !important;
+  border-radius:18px !important;
+  background:#fef2f2 !important;
+  border:1px solid #fecaca !important;
+  color:#dc2626 !important;
+  font-weight:800 !important;
+  margin-bottom:22px !important;
+}
+
+:root[data-theme="light"] .profileCompactGrid,
+:root[data-theme="light"] .profileFormGrid{
+  display:grid !important;
+  grid-template-columns:1fr 1fr !important;
+  gap:24px !important;
+}
+
+:root[data-theme="light"] .profileField label,
+:root[data-theme="light"] .profileCompactCard label{
+  display:block !important;
+  margin-bottom:8px !important;
+  color:#334155 !important;
+  font-size:14px !important;
+  font-weight:800 !important;
+}
+
+:root[data-theme="light"] .profileField input,
+:root[data-theme="light"] .profileCompactCard input{
+  width:100% !important;
+  background:#ffffff !important;
+  border:1px solid #dbe4ee !important;
+  border-radius:18px !important;
+  padding:16px 18px !important;
+  font-size:15px !important;
+  color:#0f172a !important;
+  transition:all .25s ease !important;
+  box-shadow:0 8px 18px rgba(15,23,42,0.04) !important;
+}
+
+:root[data-theme="light"] .profileField input:focus,
+:root[data-theme="light"] .profileCompactCard input:focus{
+  border-color:#fb923c !important;
+  box-shadow:0 0 0 5px rgba(251,146,60,0.18) !important;
+  transform:translateY(-1px) !important;
+  outline:none !important;
+}
+
+:root[data-theme="light"] .profileField input:disabled,
+:root[data-theme="light"] .profileCompactCard input:disabled{
+  background:#f8fafc !important;
+  color:#94a3b8 !important;
+}
+
+:root[data-theme="light"] .profileActionRow{
+  margin-top:26px !important;
+  display:flex !important;
+  justify-content:flex-start !important;
+}
+
+:root[data-theme="light"] .profileCompactCard .btn,
+:root[data-theme="light"] .profileCompactCard button{
+  margin-top:10px !important;
+  background:linear-gradient(135deg,#fb923c,#f97316) !important;
+  color:#ffffff !important;
+  border:none !important;
+  border-radius:18px !important;
+  padding:16px 28px !important;
+  font-size:16px !important;
+  font-weight:900 !important;
+  box-shadow:0 18px 34px rgba(249,115,22,0.26) !important;
+  transition:all .25s ease !important;
+}
+
+:root[data-theme="light"] .profileCompactCard .btn:hover,
+:root[data-theme="light"] .profileCompactCard button:hover{
+  transform:translateY(-3px) !important;
+  box-shadow:0 24px 42px rgba(249,115,22,0.34) !important;
+}
+
+@media(max-width:768px){
+  :root[data-theme="light"] .profileCompactCard{
+    padding:28px !important;
+    border-radius:26px !important;
+  }
+
+  :root[data-theme="light"] .profileCompactGrid,
+  :root[data-theme="light"] .profileFormGrid{
+    grid-template-columns:1fr !important;
+    gap:18px !important;
+  }
+
+  :root[data-theme="light"] .profileCompactHeader{
+    flex-direction:column-reverse !important;
+    align-items:flex-start !important;
+  }
+
+  :root[data-theme="light"] .profileAvatarMini{
+    margin-bottom:4px !important;
+  }
+
+  :root[data-theme="light"] .profileCompactTitle{
+    font-size:32px !important;
+  }
+}
+
+/* =========================================
+   HELP CENTRE LIGHT MODE TEXT VISIBILITY FIX
+========================================= */
+
+:root[data-theme="light"] .help-message,
+:root[data-theme="light"] .help-chat-message,
+:root[data-theme="light"] .ticket-message,
+:root[data-theme="light"] .chat-message {
+  color: #111827 !important;
+}
+
+/* USER MESSAGE */
+:root[data-theme="light"] .help-message.user,
+:root[data-theme="light"] .ticket-message.user,
+:root[data-theme="light"] .chat-message.user {
+  background: #ffffff !important;
+  border: 1px solid #fed7aa !important;
+  color: #111827 !important;
+
+  box-shadow:
+    0 8px 20px rgba(249, 115, 22, 0.08);
+}
+
+/* ADMIN MESSAGE */
+:root[data-theme="light"] .help-message.staff,
+:root[data-theme="light"] .ticket-message.admin,
+:root[data-theme="light"] .chat-message.admin {
+  background: #fff7ed !important;
+  border: 1px solid #fdba74 !important;
+  color: #111827 !important;
+
+  box-shadow:
+    0 8px 20px rgba(249, 115, 22, 0.10);
+}
+
+/* MESSAGE TITLE */
+:root[data-theme="light"] .help-message strong,
+:root[data-theme="light"] .help-message-top,
+:root[data-theme="light"] .chat-message strong,
+:root[data-theme="light"] .ticket-message strong {
+  color: #111827 !important;
+}
+
+/* MESSAGE BODY */
+:root[data-theme="light"] .help-message-body,
+:root[data-theme="light"] .chat-message-body,
+:root[data-theme="light"] .ticket-message-body {
+  color: #1f2937 !important;
+  font-weight: 500;
+}
+
+/* TIME */
+:root[data-theme="light"] .help-message-time,
+:root[data-theme="light"] .chat-message-time,
+:root[data-theme="light"] .ticket-message-time {
+  color: #64748b !important;
+}
+
+/* CHAT AREA */
+:root[data-theme="light"] .help-messages,
+:root[data-theme="light"] .chat-area,
+:root[data-theme="light"] .ticket-chat-box {
+  background:
+    linear-gradient(135deg, #ffffff, #fffaf5) !important;
+
+  border: 1px solid #fed7aa !important;
+
+  border-radius: 24px !important;
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.6);
+}
+
+/* INPUT */
+:root[data-theme="light"] .help-textarea,
+:root[data-theme="light"] .chat-input,
+:root[data-theme="light"] textarea {
+  color: #111827 !important;
+  background: #ffffff !important;
+}
+
+/* PLACEHOLDER */
+:root[data-theme="light"] textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* =========================================
+   LOGIN & SIGNUP PAGE FOOD BACKGROUND
+   Added override for existing auth classes
+========================================= */
+
+.authShell,
+.authPage,
+.loginPage,
+.signupPage,
+.auth-page-wrapper {
+  min-height: 100vh !important;
+  width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 30px !important;
+  position: relative !important;
+  overflow: hidden !important;
+
+  background:
+    linear-gradient(
+      rgba(0, 0, 0, 0.45),
+      rgba(0, 0, 0, 0.55)
+    ),
+    url("./assets/food-bg.jpeg") !important;
+
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
+}
+
+/* FOOD BACKGROUND SOFT OVERLAY */
+.authShell::before,
+.authPage::before,
+.loginPage::before,
+.signupPage::before,
+.auth-page-wrapper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top left, rgba(34, 197, 94, 0.18), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.12), transparent 30%);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.authShell > *,
+.authPage > *,
+.loginPage > *,
+.signupPage > *,
+.auth-page-wrapper > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* LOGIN / SIGNUP CARD */
+.authCard,
+.authCard.modernAuthCard,
+.loginCard,
+.signupCard,
+.auth-container {
+  width: 100% !important;
+  max-width: 430px !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255,255,255,0.35) !important;
+  border-radius: 34px !important;
+  padding: 38px !important;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.28) !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+.registerCardWide {
+  max-width: 760px !important;
+}
+
+/* AUTH HEADER */
+.authHeader {
+  text-align: center !important;
+  margin-bottom: 26px !important;
+}
+
+/* TOP BADGE */
+.authBadge,
+.loginBadge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 10px 18px !important;
+  border-radius: 999px !important;
+  background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+  color: white !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  letter-spacing: 1px !important;
+  margin-bottom: 18px !important;
+  box-shadow: 0 10px 22px rgba(34, 197, 94, 0.28) !important;
+}
+
+/* TITLE */
+.authCard h1,
+.authCard.modernAuthCard h1,
+.loginCard h1,
+.signupCard h1,
+.auth-container h1,
+.authHeader h1 {
+  font-size: 42px !important;
+  font-weight: 900 !important;
+  color: #0f172a !important;
+  margin-bottom: 10px !important;
+  text-align: center !important;
+  line-height: 1.1 !important;
+}
+
+/* SUBTITLE */
+.authCard p,
+.authCard.modernAuthCard p,
+.loginCard p,
+.signupCard p,
+.auth-subtitle,
+.authHeader p {
+  color: #64748b !important;
+  text-align: center !important;
+  margin-bottom: 28px !important;
+  font-weight: 500 !important;
+}
+
+/* LABEL */
+.authCard label,
+.authCard.modernAuthCard label,
+.loginCard label,
+.signupCard label,
+.fieldBlock label {
+  color: #334155 !important;
+  font-weight: 700 !important;
+  margin-bottom: 8px !important;
+  display: block !important;
+}
+
+/* INPUT */
+.authCard input,
+.authCard.modernAuthCard input,
+.loginCard input,
+.signupCard input,
+.authInput {
+  width: 100% !important;
+  height: auto !important;
+  background: rgba(255,255,255,0.96) !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  padding: 16px 18px !important;
+  border-radius: 18px !important;
+  margin-bottom: 22px !important;
+  font-size: 15px !important;
+  transition: 0.3s ease !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05) !important;
+}
+
+.authCard input::placeholder,
+.authCard.modernAuthCard input::placeholder,
+.loginCard input::placeholder,
+.signupCard input::placeholder,
+.authInput::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* INPUT FOCUS */
+.authCard input:focus,
+.authCard.modernAuthCard input:focus,
+.loginCard input:focus,
+.signupCard input:focus,
+.authInput:focus {
+  border-color: #22c55e !important;
+  box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.18) !important;
+  outline: none !important;
+  background: #ffffff !important;
+}
+
+/* LOGIN / SIGNUP BUTTON */
+.authBtn,
+.loginBtn,
+.signupBtn,
+.authCard button,
+.authCard.modernAuthCard button,
+.authPrimaryBtn,
+.authSecondaryBtn {
+  width: 100% !important;
+  min-height: 52px !important;
+  padding: 16px !important;
+  border: none !important;
+  border-radius: 18px !important;
+  background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+  color: white !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  cursor: pointer !important;
+  transition: 0.3s ease !important;
+  box-shadow: 0 16px 34px rgba(34, 197, 94, 0.28) !important;
+}
+
+/* BUTTON HOVER */
+.authBtn:hover,
+.loginBtn:hover,
+.signupBtn:hover,
+.authCard button:hover,
+.authCard.modernAuthCard button:hover,
+.authPrimaryBtn:hover,
+.authSecondaryBtn:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 20px 40px rgba(34, 197, 94, 0.34) !important;
+}
+
+/* REGISTER TEXT */
+.authFooterText,
+.auth-footer,
+.auth-footer a {
+  text-align: center !important;
+  margin-top: 22px !important;
+  color: #64748b !important;
+}
+
+.authFooterText a,
+.auth-footer a {
+  color: #f97316 !important;
+  font-weight: 800 !important;
+  text-decoration: none !important;
+}
+
+.authFooterText a:hover,
+.auth-footer a:hover {
+  text-decoration: underline !important;
+}
+
+/* AUTH SUCCESS / ERROR */
+.authCard .successBox,
+.authCard.modernAuthCard .successBox {
+  background: #ecfdf5 !important;
+  color: #15803d !important;
+  border: 1px solid #86efac !important;
+}
+
+.authCard .errorBox,
+.authCard.modernAuthCard .errorBox {
+  background: #fef2f2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fecaca !important;
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+  .authShell,
+  .authPage,
+  .loginPage,
+  .signupPage,
+  .auth-page-wrapper {
+    padding: 18px !important;
+    background-attachment: scroll !important;
+  }
+
+  .authCard,
+  .authCard.modernAuthCard,
+  .loginCard,
+  .signupCard,
+  .auth-container {
+    padding: 28px !important;
+    border-radius: 26px !important;
+  }
+
+  .authCard h1,
+  .authCard.modernAuthCard h1,
+  .loginCard h1,
+  .signupCard h1,
+  .authHeader h1 {
+    font-size: 34px !important;
+  }
+}
+
